@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -11,11 +12,12 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Phone, UserPlus } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
-import { sendOtp as mockSendOtp } from '@/services/sms'; // Mocked
+
+const RECAPTCHA_CONTAINER_ID = "recaptcha-container";
 
 export default function SignupPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const { setTempPhoneNumber, isLoading: authIsLoading } = useAuth();
+  const { sendOtpToFirebase, isLoading: authIsLoading } = useAuth();
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -28,15 +30,13 @@ export default function SignupPage() {
     }
 
     setIsSendingOtp(true);
-    // In a real app, you'd call your backend to send OTP via SMS
-    const otpSent = await mockSendOtp(phoneNumber, "1234"); // Mock: always sends "1234"
+    const otpSent = await sendOtpToFirebase(phoneNumber, RECAPTCHA_CONTAINER_ID);
 
     if (otpSent) {
-      setTempPhoneNumber(phoneNumber);
-      toast({ title: "OTP Sent", description: `An OTP has been sent to ${phoneNumber}. (Mock: 1234)` });
+      toast({ title: "OTP Sent", description: `An OTP has been sent to +91${phoneNumber}.` });
       router.push('/signup/verify-otp');
     } else {
-      toast({ title: "Failed to Send OTP", description: "Please try again.", variant: "destructive" });
+      toast({ title: "Failed to Send OTP", description: "Please ensure you're not using a test number if reCAPTCHA isn't configured for it, or try again.", variant: "destructive" });
     }
     setIsSendingOtp(false);
   };
@@ -55,7 +55,7 @@ export default function SignupPage() {
           <div className="space-y-2">
             <Label htmlFor="phoneNumber" className="flex items-center">
               <Phone className="mr-2 h-5 w-5 text-primary" />
-              Phone Number
+              Phone Number (10 digits, India)
             </Label>
             <Input
               id="phoneNumber"
@@ -68,6 +68,8 @@ export default function SignupPage() {
               className="text-lg"
             />
           </div>
+          {/* Container for reCAPTCHA, typically invisible or a button */}
+          <div id={RECAPTCHA_CONTAINER_ID}></div>
           <Button type="submit" className="w-full text-lg py-3" disabled={isLoading}>
             {isLoading ? 'Sending OTP...' : 'Send OTP'}
           </Button>

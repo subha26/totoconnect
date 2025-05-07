@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from 'next/navigation';
@@ -11,16 +12,17 @@ import { PlusCircle, ShieldAlert, UserCircle2, Car, MapPin, Clock, Users, Phone,
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Ride } from '@/lib/types'; // Import Ride type
 
 export default function PassengerHomePage() {
   const router = useRouter();
   const { currentUser } = useAuth();
   const { 
-    rides: scheduledRides, // All rides for now, should be filtered
+    rides: allRides, 
     isLoading: ridesLoading, 
     reserveSeat, 
     cancelReservation,
-    updateRideStatus,
+    updateRideStatus, // Not typically used by passenger to change core status
     currentPassengerRide 
   } = useRides();
   const { toast } = useToast();
@@ -30,7 +32,7 @@ export default function PassengerHomePage() {
     if (success) {
       toast({ title: "Seat Reserved!", description: "Your spot is confirmed." });
     } else {
-      toast({ title: "Reservation Failed", description: "Could not reserve seat. Please try again.", variant: "destructive" });
+      toast({ title: "Reservation Failed", description: "Could not reserve seat. It might be full or already reserved.", variant: "destructive" });
     }
   };
 
@@ -44,25 +46,24 @@ export default function PassengerHomePage() {
   };
   
   const handleConfirmBoarded = async (rideId: string) => {
-    // This is a passenger action, could update status to 'On Route' from their perspective or a specific boarded status
-    // For simplicity, let's assume this action implicitly moves to 'On Route' or confirms presence.
-    // In a real app, the driver would primarily control 'On Route' status.
-    // Let's simulate passenger confirming they are on board, which might trigger UI changes for them.
-    // No direct status change, but could be tracked.
     toast({ title: "Ride Confirmed", description: "You have confirmed you are on board." });
-    // Potentially update a local state or a specific passenger status on the ride object if backend supports it.
-    // For now, this is a UI confirmation.
-    // If this should actually change the ride status, ensure passenger has permission or it's a special passenger-initiated status.
-    // Example: updateRideStatus(rideId, 'On Route'); // if passenger action could do this
+    // In a more complex system, this might update a passenger's specific status within the ride document
+    // For example: ride.passengers[index].boarded = true
   };
 
-  const availableRides = scheduledRides.filter(ride => ride.status === 'Scheduled' && !ride.passengers.find(p => p.userId === currentUser?.id));
+  // Filter available rides: scheduled, not full, and passenger is not already on it.
+  const availableRides = currentUser ? allRides.filter(ride => 
+    ride.status === 'Scheduled' && 
+    ride.seatsAvailable > 0 &&
+    !ride.passengers.find(p => p.userId === currentUser.id) &&
+    ride.driverId !== currentUser.id // Passenger cannot reserve their own ride if they are also a driver
+  ) : [];
 
   if (ridesLoading || !currentUser) {
     return (
       <div className="container mx-auto p-4 space-y-6">
         <Skeleton className="h-10 w-48" />
-        {currentPassengerRide && <Skeleton className="h-64 w-full rounded-xl" />}
+        {/* No need to check currentPassengerRide here as it depends on currentUser */}
         <Skeleton className="h-8 w-32" />
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-56 w-full rounded-xl" />
@@ -88,7 +89,7 @@ export default function PassengerHomePage() {
           <RideCard 
             ride={currentPassengerRide} 
             userRole="passenger"
-            onCancelReservation={handleCancelReservation}
+            onCancelReservation={handleCancelReservation} // Passenger can cancel their seat on current ride if not started
             onConfirmBoarded={handleConfirmBoarded}
             isCurrentRide={true}
           />
@@ -103,9 +104,9 @@ export default function PassengerHomePage() {
           </Button>
         </div>
         {availableRides.length > 0 ? (
-          <ScrollArea className="h-[calc(100vh-var(--current-ride-height,0px)-var(--header-height,0px)-var(--nav-height,0px)-250px)]"> {/* Adjust height as needed */}
+          <ScrollArea className="h-[calc(100vh-var(--current-ride-height,0px)-var(--header-height,0px)-var(--nav-height,0px)-250px)]">
             <div className="grid gap-4 md:grid-cols-2">
-              {availableRides.map((ride) => (
+              {availableRides.map((ride: Ride) => (
                 <RideCard 
                   key={ride.id} 
                   ride={ride} 

@@ -1,10 +1,13 @@
+
+import type { Timestamp } from 'firebase/firestore';
+
 export type UserRole = 'passenger' | 'driver' | null;
 
 export interface User {
-  id: string;
+  id: string; // Corresponds to Firebase Auth UID
   phoneNumber: string;
   name: string;
-  pin: string; // In a real app, this should be hashed and never stored client-side directly
+  pin: string; // In a real app, this should be hashed and not directly compared (or use Firebase Auth for full session management)
   role: UserRole;
 }
 
@@ -26,11 +29,13 @@ export interface RidePassenger {
   phoneNumber: string;
 }
 
+// This interface represents the Ride object as used on the client-side,
+// where departureTime is an ISO string.
 export interface Ride {
-  id: string;
+  id: string; // Firestore document ID
   origin: string;
   destination: string;
-  departureTime: string; // ISO string
+  departureTime: string; // ISO string for client-side use
   seatsAvailable: number;
   totalSeats: number;
   status: RideStatus;
@@ -38,9 +43,14 @@ export interface Ride {
   driverName?: string;
   driverPhoneNumber?: string;
   passengers: RidePassenger[];
-  // For tracking simulation
   currentLatitude?: number;
   currentLongitude?: number;
   progress?: number; // 0-100
-  requestedBy?: string; // passengerId for requested rides
+  requestedBy?: string; // passengerId (Firebase UID) for requested rides
+}
+
+// This interface can be used when preparing data for Firestore,
+// where departureTime is a Firestore Timestamp.
+export interface RideFirestoreData extends Omit<Ride, 'id' | 'departureTime'> {
+  departureTime: Timestamp;
 }

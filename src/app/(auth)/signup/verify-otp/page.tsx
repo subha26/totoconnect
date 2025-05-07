@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -13,28 +14,28 @@ import { ShieldCheck } from 'lucide-react';
 
 export default function VerifyOtpPage() {
   const [otp, setOtp] = useState('');
-  const { tempPhoneNumber, verifyOtp, isLoading: authIsLoading } = useAuth();
+  // tempPhoneNumberStore is used to display the number, actual verification uses Firebase's session
+  const { tempPhoneNumberStore, confirmOtpFromFirebase, isLoading: authIsLoading } = useAuth();
   const [isVerifying, setIsVerifying] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!tempPhoneNumber) {
-      // If no phone number is in context (e.g. direct navigation), redirect to signup start
-      toast({ title: "Verification Error", description: "Please start the signup process again.", variant: "destructive" });
+    if (!tempPhoneNumberStore && !authIsLoading) { // Check authIsLoading to prevent premature redirect
+      toast({ title: "Verification Error", description: "Please start the signup process again by entering your phone number.", variant: "destructive" });
       router.replace('/signup');
     }
-  }, [tempPhoneNumber, router, toast]);
+  }, [tempPhoneNumberStore, router, toast, authIsLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp.length !== 4 || !/^\d{4}$/.test(otp)) {
-      toast({ title: "Invalid OTP", description: "OTP must be 4 digits.", variant: "destructive" });
+    if (otp.length !== 6 ) { // Firebase OTP is typically 6 digits
+      toast({ title: "Invalid OTP", description: "OTP must be 6 digits.", variant: "destructive" });
       return;
     }
     
     setIsVerifying(true);
-    const success = await verifyOtp(otp); // verifyOtp is mocked in AuthContext
+    const success = await confirmOtpFromFirebase(otp);
 
     if (success) {
       toast({ title: "Phone Verified", description: "Your phone number has been successfully verified." });
@@ -52,35 +53,34 @@ export default function VerifyOtpPage() {
       <CardHeader className="text-center">
         <ShieldCheck className="mx-auto h-12 w-12 text-primary mb-2" />
         <CardTitle className="text-3xl font-bold">Verify Phone Number</CardTitle>
-        <CardDescription>Enter the 4-digit OTP sent to {tempPhoneNumber || "your phone"}.</CardDescription>
+        <CardDescription>Enter the 6-digit OTP sent to +91{tempPhoneNumberStore || "your phone"}.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="otp">4-Digit OTP</Label>
+            <Label htmlFor="otp">6-Digit OTP</Label>
             <Input
               id="otp"
-              type="text" // Use text to allow leading zeros, validation handles numeric
+              type="text" 
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              placeholder="••••"
-              maxLength={4}
+              placeholder="••••••"
+              maxLength={6}
               required
               className="text-2xl tracking-widest text-center"
             />
           </div>
-          <Button type="submit" className="w-full text-lg py-3" disabled={isLoading || !tempPhoneNumber}>
+          <Button type="submit" className="w-full text-lg py-3" disabled={isLoading || !tempPhoneNumberStore}>
             {isLoading ? 'Verifying...' : 'Verify OTP'}
           </Button>
         </form>
       </CardContent>
        <CardFooter className="flex flex-col items-center space-y-2">
         <p className="text-sm text-muted-foreground">
-          Didn't receive OTP?{' '}
-          <Button variant="link" size="sm" onClick={() => router.push('/signup')} disabled={isLoading} className="p-0 h-auto">
-            Resend
+          Didn&apos;t receive OTP?{' '}
+          <Button variant="link" size="sm" onClick={() => router.back()} disabled={isLoading} className="p-0 h-auto">
+            Resend (Go back to re-trigger)
           </Button>
-          {' '} (Mock: 1234)
         </p>
          <p className="text-sm text-muted-foreground">
           <Link href="/login" className="font-semibold text-primary hover:underline">

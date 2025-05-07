@@ -1,21 +1,23 @@
+
 "use client";
 
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Label } from '@/components/ui/label'; // Corrected import
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, ShieldAlert, Check, CircleDot, Hourglass, Car } from 'lucide-react'; // Removed Label from here
+import { Label } from '@/components/ui/label';
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car } from 'lucide-react';
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/auth-context'; // Import useAuth
 
 interface RideCardProps {
   ride: Ride;
   userRole: UserRole;
   onReserve?: (rideId: string) => void;
   onCancelReservation?: (rideId: string) => void;
-  onViewDetails?: (rideId: string) => void; // For navigating to a detailed ride view
+  onViewDetails?: (rideId: string) => void;
   onStartRide?: (rideId: string) => void;
   onCompleteRide?: (rideId: string) => void;
   onAcceptRequest?: (rideId: string) => void;
@@ -54,12 +56,14 @@ export function RideCard({
   isCurrentRide = false,
   className,
 }: RideCardProps) {
+  const { currentUser } = useAuth(); // Get currentUser from context
   const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, passengers, progress } = ride;
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
   
-  const passengerIsOnThisRide = isPassenger && passengers.some(p => p.userId === localStorage.getItem('totoConnectUser') ? JSON.parse(localStorage.getItem('totoConnectUser')!).id : null);
+  // Check if the current passenger (from auth context) is on this ride
+  const passengerIsOnThisRide = isPassenger && currentUser && passengers.some(p => p.userId === currentUser.id);
 
   const renderPassengerActions = () => {
     if (status === 'Requested' || status === 'Completed' || status === 'Cancelled') return null;
@@ -72,14 +76,16 @@ export function RideCard({
               <Check className="mr-2 h-4 w-4" /> Confirm Boarded
             </Button>
           )}
-          <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full">
-            <XCircle className="mr-2 h-4 w-4" /> Cancel Seat
-          </Button>
+          { (status === 'Scheduled' || status === 'About to Depart') && /* Allow cancellation if not yet on route for current ride */
+            <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full mt-2">
+                <XCircle className="mr-2 h-4 w-4" /> Cancel Seat
+            </Button>
+          }
         </>
       );
     }
 
-    if (passengerIsOnThisRide) {
+    if (passengerIsOnThisRide) { // For upcoming rides, not current
       return (
         <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="outline" className="w-full">
           <XCircle className="mr-2 h-4 w-4" /> Cancel Reservation
@@ -87,24 +93,35 @@ export function RideCard({
       );
     }
 
-    if (seatsAvailable > 0 && status === 'Scheduled') {
+    // For available rides (not current, passenger not on it yet)
+    if (seatsAvailable > 0 && status === 'Scheduled' && onReserve) {
       return (
-        <Button onClick={() => onReserve?.(id)} size="sm" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button onClick={() => onReserve(id)} size="sm" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           Reserve Spot
         </Button>
       );
     }
-    return <p className="text-sm text-muted-foreground">No seats available or ride not reservable.</p>;
+    if (status === 'Scheduled' && seatsAvailable <= 0) {
+        return <p className="text-sm text-muted-foreground">Ride is full.</p>;
+    }
+    return null; // Default no action for other cases (e.g. ride on route and passenger not on it)
   };
 
   const renderDriverActions = () => {
-    if (status === 'Requested' && onAcceptRequest) {
-      return (
-        <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
-          <CheckCircle className="mr-2 h-4 w-4" /> Accept Request
-        </Button>
-      );
+    // Driver actions are only for rides they own
+    if (!currentUser || ride.driverId !== currentUser.id) {
+        // If it's a requested ride and current user is a driver, they can accept
+        if (status === 'Requested' && onAcceptRequest && isDriver) {
+             return (
+                <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
+                <CheckCircle className="mr-2 h-4 w-4" /> Accept Request
+                </Button>
+            );
+        }
+        return null; // Not the driver of this ride, or not a driver action for this status
     }
+
+
     if (status === 'Scheduled' && onStartRide) {
       return (
         <Button onClick={() => onStartRide(id)} size="sm" className="w-full">
@@ -112,19 +129,22 @@ export function RideCard({
         </Button>
       );
     }
-    if (status === 'On Route' && onCompleteRide) {
+    if ((status === 'On Route' || status === 'Destination Reached') && onCompleteRide) { // Allow complete if destination reached
       return (
         <Button onClick={() => onCompleteRide(id)} size="sm" className="w-full">
           <Flag className="mr-2 h-4 w-4" /> Complete Ride
         </Button>
       );
     }
-    if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route' )) { // Ensure driver can only cancel their *own* current ride
-       return (
-         <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full"> {/* Driver cancelling whole ride */}
-            <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
-          </Button>
-       );
+    // Driver can cancel their *own* ride if it's scheduled or about to depart (for current ride or upcoming)
+    if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route')) { 
+       if(onCancelReservation) { // onCancelReservation here means driver cancelling the whole ride
+         return (
+           <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full">
+              <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
+            </Button>
+         );
+       }
     }
     return null;
   };
@@ -147,7 +167,7 @@ export function RideCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="p-4 space-y-3">
-        {isCurrentRide && (isPassenger || isDriver) && (ride.status === 'On Route' || ride.status === 'Arriving' || ride.status === 'At Source' || ride.status === 'Waiting' || ride.status === 'Destination Reached') && (
+        {isCurrentRide && (isPassenger || (isDriver && currentUser && ride.driverId === currentUser.id )) && (ride.status === 'On Route' || ride.status === 'Arriving' || ride.status === 'At Source' || ride.status === 'Waiting' || ride.status === 'Destination Reached') && (
           <div className="space-y-2">
             <Label className="text-xs font-semibold text-muted-foreground">RIDE PROGRESS</Label>
             <div className="flex items-center space-x-2 text-sm">
@@ -161,23 +181,26 @@ export function RideCard({
         {isPassenger && driverName && (
           <p className="text-sm flex items-center"><Car className="mr-2 h-4 w-4 text-muted-foreground" /> Driver: {driverName}</p>
         )}
+         {!driverName && status === 'Requested' && (
+            <p className="text-sm text-muted-foreground">Awaiting driver assignment...</p>
+        )}
         
         <div className="flex justify-between items-center text-sm">
           <div className="flex items-center">
             <Users className="mr-2 h-4 w-4 text-muted-foreground" />
             <span>
-              {status === 'Requested' ? 'Awaiting driver' : `${seatsAvailable}/${totalSeats} seats left`}
+              {status === 'Requested' ? 'Awaiting driver' : `${seatsAvailable} / ${totalSeats} seats left`}
             </span>
           </div>
-          {isDriver && status !== 'Requested' && (
+          {isDriver && status !== 'Requested' && currentUser && ride.driverId === currentUser.id && (
             <p className="text-sm">Passengers: {passengers.length}</p>
           )}
         </div>
 
-        {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (
+        {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (currentUser && (passengerIsOnThisRide || ride.driverId === currentUser.id)) && (
           <div className="grid grid-cols-2 gap-2 pt-2">
             <Button variant="outline" size="sm">
-              <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? 'Driver' : 'Passenger(s)'}
+              <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}
             </Button>
             <Button variant="outline" size="sm">
               <MessageSquare className="mr-2 h-4 w-4" /> Chat
@@ -186,11 +209,19 @@ export function RideCard({
         )}
 
       </CardContent>
-      <CardFooter className="p-4 bg-secondary/30 space-y-2 flex flex-col">
+      <CardFooter className="p-4 bg-secondary/30 space-y-2 flex flex-col items-stretch">
         {isPassenger && renderPassengerActions()}
         {isDriver && renderDriverActions()}
-        {onViewDetails && !isCurrentRide && (status !== 'Requested' || isPassenger) && ( // Allow passenger to view details of their requested ride
-          <Button onClick={() => onViewDetails(id)} variant="link" size="sm" className="w-full text-primary">
+        
+        {/* View Details Button Logic */}
+        {/* Show if not a current ride, OR if it's a current ride but passenger is not on it and it's reservable */}
+        {/* OR if it's a requested ride and the current user is the requester */}
+        {onViewDetails && (
+            (!isCurrentRide) ||
+            (isCurrentRide && isPassenger && !passengerIsOnThisRide && status === 'Scheduled' && seatsAvailable > 0) ||
+            (status === 'Requested' && currentUser && ride.requestedBy === currentUser.id)
+        ) && (
+          <Button onClick={() => onViewDetails(id)} variant="link" size="sm" className="w-full text-primary mt-2">
             View Details
           </Button>
         )}

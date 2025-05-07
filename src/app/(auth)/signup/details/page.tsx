@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -17,18 +18,19 @@ export default function SignupDetailsPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [role, setRole] = useState<UserRole>(null);
-  const { tempPhoneNumber, signupDetails, isLoading: authIsLoading } = useAuth();
+  const { tempPhoneNumberStore, firebaseUser, signupDetails, isLoading: authIsLoading } = useAuth(); // Use tempPhoneNumberStore and firebaseUser
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!tempPhoneNumber) {
-      // If no phone number is in context (e.g. direct navigation or refresh after OTP), redirect to signup start
-      toast({ title: "Signup Error", description: "Please start the signup process again.", variant: "destructive" });
+    // User should have been authenticated by Firebase (firebaseUser exists)
+    // and tempPhoneNumberStore should be set from the OTP step.
+    if (!authIsLoading && (!firebaseUser || !tempPhoneNumberStore)) {
+      toast({ title: "Signup Error", description: "Phone verification incomplete. Please start over.", variant: "destructive" });
       router.replace('/signup');
     }
-  }, [tempPhoneNumber, router, toast]);
+  }, [firebaseUser, tempPhoneNumberStore, router, toast, authIsLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,17 +58,17 @@ export default function SignupDetailsPage() {
       toast({ title: "Signup Successful!", description: `Welcome, ${name}!` });
       // AuthContext handles redirection
     } else {
-      toast({ title: "Signup Failed", description: "An error occurred. Please try again.", variant: "destructive" });
+      toast({ title: "Signup Failed", description: "An error occurred. Please try again. The phone number might already be registered.", variant: "destructive" });
     }
     setIsSubmitting(false);
   };
 
   const isLoading = authIsLoading || isSubmitting;
 
-  if (!tempPhoneNumber) {
-      return ( // Basic loading/redirecting state
+  if (!firebaseUser || !tempPhoneNumberStore) {
+      return ( 
         <div className="flex items-center justify-center min-h-screen">
-            <p>Loading user data...</p>
+            <p>Loading user data or redirecting...</p>
         </div>
       )
   }
@@ -76,7 +78,7 @@ export default function SignupDetailsPage() {
       <CardHeader className="text-center">
         <CheckCircle className="mx-auto h-12 w-12 text-primary mb-2" />
         <CardTitle className="text-3xl font-bold">Complete Your Profile</CardTitle>
-        <CardDescription>Just a few more details for {tempPhoneNumber}.</CardDescription>
+        <CardDescription>Just a few more details for +91{tempPhoneNumberStore}.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
