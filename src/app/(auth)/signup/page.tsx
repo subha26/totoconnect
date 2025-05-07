@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -8,17 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, UserPlus } from 'lucide-react';
+import type { UserRole } from '@/lib/types';
+import { Phone, UserCircle2, KeyRound, Users, UserPlus } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
-
-const RECAPTCHA_CONTAINER_ID = "recaptcha-container";
 
 export default function SignupPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const { sendOtpToFirebase, isLoading: authIsLoading } = useAuth();
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [name, setName] = useState('');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [role, setRole] = useState<UserRole>(null);
+  const { signup, isLoading: authIsLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -28,27 +31,43 @@ export default function SignupPage() {
       toast({ title: "Invalid Phone Number", description: "Please enter a 10-digit phone number.", variant: "destructive" });
       return;
     }
-
-    setIsSendingOtp(true);
-    const otpSent = await sendOtpToFirebase(phoneNumber, RECAPTCHA_CONTAINER_ID);
-
-    if (otpSent) {
-      toast({ title: "OTP Sent", description: `An OTP has been sent to +91${phoneNumber}.` });
-      router.push('/signup/verify-otp');
-    } else {
-      toast({ title: "Failed to Send OTP", description: "Please ensure you're not using a test number if reCAPTCHA isn't configured for it, or try again.", variant: "destructive" });
+    if (!name.trim()) {
+      toast({ title: "Invalid Name", description: "Please enter your name.", variant: "destructive" });
+      return;
     }
-    setIsSendingOtp(false);
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      toast({ title: "Invalid PIN", description: "PIN must be 4 digits.", variant: "destructive" });
+      return;
+    }
+    if (pin !== confirmPin) {
+      toast({ title: "PINs Don't Match", description: "Please ensure both PINs are the same.", variant: "destructive" });
+      return;
+    }
+    if (!role) {
+      toast({ title: "Select Role", description: "Please select if you are a Passenger or Driver.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    const success = await signup(phoneNumber, name, pin, role);
+
+    if (success) {
+      toast({ title: "Signup Successful!", description: `Welcome, ${name}!` });
+      // AuthContext handles redirection
+    } else {
+      toast({ title: "Signup Failed", description: "An error occurred. The phone number might already be registered or there was a server issue.", variant: "destructive" });
+    }
+    setIsSubmitting(false);
   };
 
-  const isLoading = authIsLoading || isSendingOtp;
+  const isLoading = authIsLoading || isSubmitting;
 
   return (
     <Card className="w-full max-w-md shadow-none border-none">
       <CardHeader className="text-center">
         <UserPlus className="mx-auto h-12 w-12 text-primary mb-2" />
         <CardTitle className="text-3xl font-bold">Create Account on {APP_NAME}</CardTitle>
-        <CardDescription>Enter your phone number to get started. We&apos;ll send you an OTP to verify.</CardDescription>
+        <CardDescription>Enter your details to get started.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -68,10 +87,80 @@ export default function SignupPage() {
               className="text-lg"
             />
           </div>
-          {/* Container for reCAPTCHA, typically invisible or a button */}
-          <div id={RECAPTCHA_CONTAINER_ID}></div>
+
+          <div className="space-y-2">
+            <Label htmlFor="name" className="flex items-center">
+              <UserCircle2 className="mr-2 h-5 w-5 text-primary" />
+              Full Name
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
+              required
+              className="text-lg"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pin" className="flex items-center">
+              <KeyRound className="mr-2 h-5 w-5 text-primary" />
+              Set 4-Digit PIN
+            </Label>
+            <Input
+              id="pin"
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="••••"
+              maxLength={4}
+              required
+              className="text-lg tracking-widest"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPin" className="flex items-center">
+              <KeyRound className="mr-2 h-5 w-5 text-primary" />
+             Confirm 4-Digit PIN
+            </Label>
+            <Input
+              id="confirmPin"
+              type="password"
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value)}
+              placeholder="••••"
+              maxLength={4}
+              required
+              className="text-lg tracking-widest"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center mb-2">
+                <Users className="mr-2 h-5 w-5 text-primary" />
+                I am a...
+            </Label>
+            <RadioGroup
+              value={role || undefined}
+              onValueChange={(value) => setRole(value as UserRole)}
+              className="flex space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="passenger" id="role-passenger" />
+                <Label htmlFor="role-passenger" className="text-lg">Passenger</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="driver" id="role-driver" />
+                <Label htmlFor="role-driver" className="text-lg">Driver</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
           <Button type="submit" className="w-full text-lg py-3" disabled={isLoading}>
-            {isLoading ? 'Sending OTP...' : 'Send OTP'}
+            {isLoading ? 'Creating Account...' : 'Sign Up'}
           </Button>
         </form>
       </CardContent>
