@@ -1,5 +1,7 @@
+
 "use client";
 
+import React, { useState } from 'react'; // Import React and useState
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +13,7 @@ import { PlusCircle, Bell, ShieldAlert, Car, Users, MessageSquare, Phone } from 
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
 
 export default function DriverHomePage() {
   const router = useRouter();
@@ -24,6 +27,16 @@ export default function DriverHomePage() {
     currentDriverRide
   } = useRides();
   const { toast } = useToast();
+
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatRideId, setChatRideId] = useState<string | null>(null);
+  const [chatModalTitle, setChatModalTitle] = useState("");
+
+  const handleOpenChatModal = (rideId: string, title: string) => {
+    setChatRideId(rideId);
+    setChatModalTitle(title);
+    setIsChatModalOpen(true);
+  };
 
   const handleStartRide = async (rideId: string) => {
     const success = await updateRideStatus(rideId, 'On Route', 10); // Start with 10% progress
@@ -69,8 +82,8 @@ export default function DriverHomePage() {
         updateRideStatus(activeRide.id, 'On Route', newProgress);
       }, 5000); // Update every 5 seconds
 
-      // useEffect cleanup
-      // return () => clearInterval(intervalId); // This causes issues with client components
+      // useEffect cleanup - This could be problematic in some Next.js strict mode setups
+      // return () => clearInterval(intervalId); 
   }
 
 
@@ -109,6 +122,7 @@ export default function DriverHomePage() {
                 await updateRideStatus(id, "Cancelled");
                 toast({title: "Ride Cancelled", variant: "destructive"});
             }}
+            onOpenChat={handleOpenChatModal}
             isCurrentRide={true}
           />
         </section>
@@ -131,6 +145,7 @@ export default function DriverHomePage() {
                   userRole="driver" 
                   onStartRide={handleStartRide}
                   onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                  onOpenChat={handleOpenChatModal}
                 />
               ))}
             </div>
@@ -153,7 +168,7 @@ export default function DriverHomePage() {
             </Button>
         </div>
          {driverRideRequests.length > 0 ? (
-            <ScrollArea className="h-[200px]"> {/* Fixed height for this section or adjust as needed */}
+            <ScrollArea className="h-[200px)]"> {/* Fixed height for this section or adjust as needed */}
                 <div className="grid gap-4 md:grid-cols-2">
                 {driverRideRequests.slice(0,2).map((ride) => ( // Show first 2 requests
                     <RideCard 
@@ -162,6 +177,7 @@ export default function DriverHomePage() {
                     userRole="driver" 
                     onAcceptRequest={handleAcceptRequest}
                     onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                    // No chat for mere requests yet, only for confirmed/active rides
                     />
                 ))}
                 </div>
@@ -175,6 +191,15 @@ export default function DriverHomePage() {
           </Card>
         )}
       </section>
+      {currentUser && chatRideId && (
+        <ChatModal
+          isOpen={isChatModalOpen}
+          onClose={() => setIsChatModalOpen(false)}
+          rideId={chatRideId}
+          chatTitle={chatModalTitle}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 }

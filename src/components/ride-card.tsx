@@ -23,6 +23,7 @@ interface RideCardProps {
   onCompleteRide?: (rideId: string) => void;
   onAcceptRequest?: (rideId: string) => void;
   onConfirmBoarded?: (rideId: string) => void;
+  onOpenChat?: (rideId: string, chatTitle: string) => void; // New prop for opening chat
   isCurrentRide?: boolean;
   className?: string;
 }
@@ -54,17 +55,58 @@ export function RideCard({
   onCompleteRide,
   onAcceptRequest,
   onConfirmBoarded,
+  onOpenChat,
   isCurrentRide = false,
   className,
 }: RideCardProps) {
   const { currentUser } = useAuth(); 
   const { toast } = useToast();
-  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, passengers, progress } = ride;
+  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers, progress } = ride;
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
   
   const passengerIsOnThisRide = isPassenger && currentUser && passengers.some(p => p.userId === currentUser.id);
+
+  const handleCall = () => {
+    let phoneNumberToCall = '';
+    let contactName = '';
+
+    if (isPassenger && driverPhoneNumber) {
+      phoneNumberToCall = driverPhoneNumber;
+      contactName = driverName || 'Driver';
+    } else if (isDriver && currentUser && ride.driverId === currentUser.id) {
+      if (passengers.length > 0 && passengers[0].phoneNumber) {
+        phoneNumberToCall = passengers[0].phoneNumber;
+        contactName = passengers[0].name || 'Passenger';
+      } else {
+        toast({ title: "No passenger to call", description: "There are no passengers on this ride yet.", variant: "default" });
+        return;
+      }
+    }
+
+    if (phoneNumberToCall) {
+      window.location.href = `tel:${phoneNumberToCall}`;
+    } else {
+      toast({ title: "Cannot make call", description: "Contact information is not available.", variant: "destructive" });
+    }
+  };
+
+  const handleChat = () => {
+    if (!onOpenChat) return;
+    let chatTitle = "";
+    if (isPassenger) {
+      chatTitle = `Chat with Driver (${driverName || 'Driver'})`;
+    } else if (isDriver && currentUser && ride.driverId === currentUser.id) {
+      chatTitle = `Group Chat for ride to ${destination}`;
+    }
+    if (chatTitle) {
+      onOpenChat(id, chatTitle);
+    } else {
+       toast({ title: "Chat Unavailable", description: "Cannot initiate chat for this ride.", variant: "default" });
+    }
+  };
+
 
   const renderPassengerActions = () => {
     if (status === 'Requested' || status === 'Completed' || status === 'Cancelled') return null;
@@ -108,7 +150,7 @@ export function RideCard({
   };
 
   const renderDriverActions = () => {
-    if (!currentUser || ride.driverId !== currentUser.id) {
+    if (!currentUser || (ride.driverId !== currentUser.id && status !== 'Requested') ) {
         if (status === 'Requested' && onAcceptRequest && isDriver) {
              return (
                 <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
@@ -118,30 +160,32 @@ export function RideCard({
         }
         return null; 
     }
-
-
-    if (status === 'Scheduled' && onStartRide) {
-      return (
-        <Button onClick={() => onStartRide(id)} size="sm" className="w-full">
-          <PlayCircle className="mr-2 h-4 w-4" /> Start Ride
-        </Button>
-      );
-    }
-    if ((status === 'On Route' || status === 'Destination Reached') && onCompleteRide) { 
-      return (
-        <Button onClick={() => onCompleteRide(id)} size="sm" className="w-full">
-          <Flag className="mr-2 h-4 w-4" /> Complete Ride
-        </Button>
-      );
-    }
-    if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route')) { 
-       if(onCancelReservation) { 
-         return (
-           <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full">
-              <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
+    
+    // Driver owns this ride or is considering accepting it
+    if (ride.driverId === currentUser.id) {
+        if (status === 'Scheduled' && onStartRide) {
+        return (
+            <Button onClick={() => onStartRide(id)} size="sm" className="w-full">
+            <PlayCircle className="mr-2 h-4 w-4" /> Start Ride
             </Button>
-         );
-       }
+        );
+        }
+        if ((status === 'On Route' || status === 'Destination Reached') && onCompleteRide) { 
+        return (
+            <Button onClick={() => onCompleteRide(id)} size="sm" className="w-full">
+            <Flag className="mr-2 h-4 w-4" /> Complete Ride
+            </Button>
+        );
+        }
+        if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route')) { 
+        if(onCancelReservation) { // This is actually "Cancel Entire Ride" for driver
+            return (
+            <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full">
+                <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
+                </Button>
+            );
+        }
+        }
     }
     return null;
   };
@@ -194,19 +238,21 @@ export function RideCard({
           )}
         </div>
 
-        {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (currentUser && (passengerIsOnThisRide || ride.driverId === currentUser.id)) && (
+        {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (currentUser && (passengerIsOnThisRide || (ride.driverId === currentUser.id && passengers.length > 0) )) && (
           <div className="grid grid-cols-2 gap-2 pt-2">
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => toast({ title: "Simulated Call", description: `Calling ${isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}... (Simulated)` })}
+              onClick={handleCall}
+              disabled={isDriver && ride.driverId === currentUser.id && passengers.length === 0 && !driverPhoneNumber}
             >
-              <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}
+              <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (driverName || 'Driver') : (passengers.length > 0 ? passengers[0].name.split(" ")[0] : 'Passenger')}
             </Button>
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => toast({ title: "Simulated Chat", description: `Opening chat with ${isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}... (Simulated)` })}
+              onClick={handleChat}
+              disabled={!onOpenChat}
             >
               <MessageSquare className="mr-2 h-4 w-4" /> Chat
             </Button>

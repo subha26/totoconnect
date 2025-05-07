@@ -2,7 +2,7 @@
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'; // Import React
 import { useRides } from '@/contexts/ride-context';
 import { useAuth } from '@/contexts/auth-context';
 import type { Ride } from '@/lib/types';
@@ -16,6 +16,7 @@ import { MapPin, Clock, Users, User, Phone, MessageSquare, Car, ArrowLeft, Shiel
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
 
 export default function RideDetailPage() {
   const params = useParams();
@@ -27,15 +28,32 @@ export default function RideDetailPage() {
   const { toast } = useToast();
   
   const [ride, setRide] = useState<Ride | null | undefined>(undefined); // undefined for initial loading, null if not found
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatModalTitle, setChatModalTitle] = useState("");
+
 
   useEffect(() => {
     if (rideId) {
       const foundRide = getRideById(rideId);
       setRide(foundRide);
     }
-  }, [rideId, getRideById, ridesLoading, currentUser]); // Re-fetch if ridesLoading changes or current user changes (for actions)
+  }, [rideId, getRideById, ridesLoading, currentUser, /* rides needed here to re-render if ride list changes */ ]); 
+  // Added rides to dependency array if getRideById might return different object for same id if rides list updated from context
 
   const isLoading = ridesLoading || authLoading || ride === undefined;
+
+  const handleOpenChatModal = () => {
+    if (!ride || !currentUser) return;
+    let title = "";
+    if (currentUser.role === 'passenger') {
+      title = `Chat with Driver (${ride.driverName || 'Driver'})`;
+    } else if (currentUser.role === 'driver' && ride.driverId === currentUser.id) {
+      title = `Group Chat for ride to ${ride.destination}`;
+    }
+    setChatModalTitle(title);
+    setIsChatModalOpen(true);
+  };
+
 
   if (isLoading) {
     return (
@@ -75,6 +93,31 @@ export default function RideDetailPage() {
   const isDriver = currentUser?.role === 'driver';
   const passengerIsOnThisRide = isPassenger && currentUser && ride.passengers.some(p => p.userId === currentUser.id);
   const isRideOwnerDriver = isDriver && currentUser && ride.driverId === currentUser.id;
+
+
+  const handleCall = () => {
+    let phoneNumberToCall = '';
+    if (isPassenger && ride.driverPhoneNumber) {
+      phoneNumberToCall = ride.driverPhoneNumber;
+    } else if (isRideOwnerDriver) {
+      if (ride.passengers.length > 0 && ride.passengers[0].phoneNumber) {
+        // For simplicity, calling the first passenger. A real app might list passengers to call individually.
+        phoneNumberToCall = ride.passengers[0].phoneNumber;
+      } else if (ride.passengers.length === 0) {
+        toast({ title: "No Passengers", description: "There are no passengers to call for this ride." });
+        return;
+      } else {
+         toast({ title: "Multiple Passengers", description: "Please use chat to communicate with multiple passengers or select one (feature coming soon)." });
+        return;
+      }
+    }
+
+    if (phoneNumberToCall) {
+      window.location.href = `tel:${phoneNumberToCall}`;
+    } else {
+      toast({ title: "Contact Unavailable", description: "Phone number not found for this contact." });
+    }
+  };
 
 
   const handleReserve = async () => {
@@ -178,15 +221,16 @@ export default function RideDetailPage() {
             </div>
           </div>
           
-          {(isPassenger || (isDriver && isRideOwnerDriver)) && ride.status !== 'Completed' && ride.status !== 'Cancelled' && (
+          {(isPassenger || (isRideOwnerDriver)) && ride.status !== 'Completed' && ride.status !== 'Cancelled' && (
              <div className="grid grid-cols-2 gap-3 pt-4 border-t mt-4">
                 <Button 
                   variant="outline"
-                  onClick={() => toast({ title: "Simulated Call", description: `Calling ${isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}... (Simulated)`})}
-                ><Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}</Button>
+                  onClick={handleCall}
+                  disabled={(isPassenger && !ride.driverPhoneNumber) || (isRideOwnerDriver && ride.passengers.length === 0)}
+                ><Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (ride.driverName || 'Driver') : (ride.passengers.length > 0 ? 'Passenger(s)' : 'Driver')}</Button>
                 <Button 
                   variant="outline"
-                  onClick={() => toast({ title: "Simulated Chat", description: `Opening chat with ${isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}... (Simulated)`})}
+                  onClick={handleOpenChatModal}
                 ><MessageSquare className="mr-2 h-4 w-4" /> Chat</Button>
             </div>
           )}
@@ -224,7 +268,15 @@ export default function RideDetailPage() {
           )}
         </CardFooter>
       </Card>
+      {rideId && currentUser && (
+        <ChatModal 
+          isOpen={isChatModalOpen} 
+          onClose={() => setIsChatModalOpen(false)} 
+          rideId={rideId} 
+          chatTitle={chatModalTitle}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 }
-

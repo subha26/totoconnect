@@ -4,7 +4,7 @@ import type { Timestamp } from 'firebase/firestore';
 export type UserRole = 'passenger' | 'driver' | null;
 
 export interface User {
-  id: string; // Corresponds to Firebase Auth UID
+  id: string; // Corresponds to Firebase Auth UID or phone number for PIN-based
   phoneNumber: string;
   name: string;
   pin: string; // In a real app, this should be hashed and not directly compared (or use Firebase Auth for full session management)
@@ -46,11 +46,19 @@ export interface Ride {
   currentLatitude?: number;
   currentLongitude?: number;
   progress?: number; // 0-100
-  requestedBy?: string; // passengerId (Firebase UID) for requested rides
+  requestedBy?: string; // passengerId for requested rides
 }
 
 // This interface can be used when preparing data for Firestore,
 // where departureTime is a Firestore Timestamp.
 export interface RideFirestoreData extends Omit<Ride, 'id' | 'departureTime'> {
   departureTime: Timestamp;
+}
+
+export interface ChatMessage {
+  id: string; // Firestore document ID
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: Timestamp; // Firestore Timestamp for ordering
 }

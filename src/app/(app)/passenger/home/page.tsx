@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useState } from 'react'; // Import React and useState
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Ride } from '@/lib/types'; // Import Ride type
+import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
 
 export default function PassengerHomePage() {
   const router = useRouter();
@@ -26,6 +28,16 @@ export default function PassengerHomePage() {
     currentPassengerRide 
   } = useRides();
   const { toast } = useToast();
+
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatRideId, setChatRideId] = useState<string | null>(null);
+  const [chatModalTitle, setChatModalTitle] = useState("");
+
+  const handleOpenChatModal = (rideId: string, title: string) => {
+    setChatRideId(rideId);
+    setChatModalTitle(title);
+    setIsChatModalOpen(true);
+  };
 
   const handleReserveSeat = async (rideId: string) => {
     const success = await reserveSeat(rideId);
@@ -91,6 +103,7 @@ export default function PassengerHomePage() {
             userRole="passenger"
             onCancelReservation={handleCancelReservation} // Passenger can cancel their seat on current ride if not started
             onConfirmBoarded={handleConfirmBoarded}
+            onOpenChat={handleOpenChatModal}
             isCurrentRide={true}
           />
         </section>
@@ -113,6 +126,7 @@ export default function PassengerHomePage() {
                   userRole="passenger" 
                   onReserve={handleReserveSeat}
                   onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                  onOpenChat={handleOpenChatModal}
                 />
               ))}
             </div>
@@ -126,6 +140,15 @@ export default function PassengerHomePage() {
           </Card>
         )}
       </section>
+      {currentUser && chatRideId && (
+        <ChatModal
+          isOpen={isChatModalOpen}
+          onClose={() => setIsChatModalOpen(false)}
+          rideId={chatRideId}
+          chatTitle={chatModalTitle}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 }
