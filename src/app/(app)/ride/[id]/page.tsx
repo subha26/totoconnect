@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Label } from '@/components/ui/label';
 import { MapPin, Clock, Users, User, Phone, MessageSquare, Car, ArrowLeft, ShieldAlert, CheckCircle, XCircle, PlayCircle, Flag } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +33,7 @@ export default function RideDetailPage() {
       const foundRide = getRideById(rideId);
       setRide(foundRide);
     }
-  }, [rideId, getRideById, ridesLoading]); // Re-fetch if ridesLoading changes (data might be ready)
+  }, [rideId, getRideById, ridesLoading, currentUser]); // Re-fetch if ridesLoading changes or current user changes (for actions)
 
   const isLoading = ridesLoading || authLoading || ride === undefined;
 
@@ -71,8 +73,8 @@ export default function RideDetailPage() {
 
   const isPassenger = currentUser?.role === 'passenger';
   const isDriver = currentUser?.role === 'driver';
-  const passengerIsOnThisRide = isPassenger && ride.passengers.some(p => p.userId === currentUser?.id);
-  const isRideOwnerDriver = isDriver && ride.driverId === currentUser?.id;
+  const passengerIsOnThisRide = isPassenger && currentUser && ride.passengers.some(p => p.userId === currentUser.id);
+  const isRideOwnerDriver = isDriver && currentUser && ride.driverId === currentUser.id;
 
 
   const handleReserve = async () => {
@@ -171,15 +173,21 @@ export default function RideDetailPage() {
                 </div>
               )}
               {ride.status === 'Requested' && ride.requestedBy && (
-                <p className="text-sm text-muted-foreground">Requested by: A passenger</p>
+                <p className="text-sm text-muted-foreground">Requested by: A passenger</p> 
               )}
             </div>
           </div>
           
           {(isPassenger || (isDriver && isRideOwnerDriver)) && ride.status !== 'Completed' && ride.status !== 'Cancelled' && (
              <div className="grid grid-cols-2 gap-3 pt-4 border-t mt-4">
-                <Button variant="outline"><Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}</Button>
-                <Button variant="outline"><MessageSquare className="mr-2 h-4 w-4" /> Chat</Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => toast({ title: "Simulated Call", description: `Calling ${isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}... (Simulated)`})}
+                ><Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}</Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => toast({ title: "Simulated Chat", description: `Opening chat with ${isPassenger ? (ride.driverName || 'Driver') : 'Passengers'}... (Simulated)`})}
+                ><MessageSquare className="mr-2 h-4 w-4" /> Chat</Button>
             </div>
           )}
 
@@ -194,7 +202,7 @@ export default function RideDetailPage() {
           )}
 
           {/* Driver Actions */}
-          {isDriver && ride.status === 'Requested' && (
+          {isDriver && ride.status === 'Requested' && !isRideOwnerDriver && ( // Ensure driver is not the one who posted this requested ride (if logic allows)
             <Button onClick={handleAccept} className="w-full bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-2 h-4 w-4" />Accept Ride Request</Button>
           )}
           {isDriver && isRideOwnerDriver && ride.status === 'Scheduled' && (
@@ -219,3 +227,4 @@ export default function RideDetailPage() {
     </div>
   );
 }
+

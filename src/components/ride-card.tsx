@@ -10,7 +10,8 @@ import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayC
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
 
 interface RideCardProps {
   ride: Ride;
@@ -56,13 +57,13 @@ export function RideCard({
   isCurrentRide = false,
   className,
 }: RideCardProps) {
-  const { currentUser } = useAuth(); // Get currentUser from context
+  const { currentUser } = useAuth(); 
+  const { toast } = useToast();
   const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, passengers, progress } = ride;
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
   
-  // Check if the current passenger (from auth context) is on this ride
   const passengerIsOnThisRide = isPassenger && currentUser && passengers.some(p => p.userId === currentUser.id);
 
   const renderPassengerActions = () => {
@@ -76,7 +77,7 @@ export function RideCard({
               <Check className="mr-2 h-4 w-4" /> Confirm Boarded
             </Button>
           )}
-          { (status === 'Scheduled' || status === 'About to Depart') && /* Allow cancellation if not yet on route for current ride */
+          { (status === 'Scheduled' || status === 'About to Depart') && 
             <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full mt-2">
                 <XCircle className="mr-2 h-4 w-4" /> Cancel Seat
             </Button>
@@ -85,7 +86,7 @@ export function RideCard({
       );
     }
 
-    if (passengerIsOnThisRide) { // For upcoming rides, not current
+    if (passengerIsOnThisRide) { 
       return (
         <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="outline" className="w-full">
           <XCircle className="mr-2 h-4 w-4" /> Cancel Reservation
@@ -93,7 +94,6 @@ export function RideCard({
       );
     }
 
-    // For available rides (not current, passenger not on it yet)
     if (seatsAvailable > 0 && status === 'Scheduled' && onReserve) {
       return (
         <Button onClick={() => onReserve(id)} size="sm" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
@@ -104,13 +104,11 @@ export function RideCard({
     if (status === 'Scheduled' && seatsAvailable <= 0) {
         return <p className="text-sm text-muted-foreground">Ride is full.</p>;
     }
-    return null; // Default no action for other cases (e.g. ride on route and passenger not on it)
+    return null; 
   };
 
   const renderDriverActions = () => {
-    // Driver actions are only for rides they own
     if (!currentUser || ride.driverId !== currentUser.id) {
-        // If it's a requested ride and current user is a driver, they can accept
         if (status === 'Requested' && onAcceptRequest && isDriver) {
              return (
                 <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
@@ -118,7 +116,7 @@ export function RideCard({
                 </Button>
             );
         }
-        return null; // Not the driver of this ride, or not a driver action for this status
+        return null; 
     }
 
 
@@ -129,16 +127,15 @@ export function RideCard({
         </Button>
       );
     }
-    if ((status === 'On Route' || status === 'Destination Reached') && onCompleteRide) { // Allow complete if destination reached
+    if ((status === 'On Route' || status === 'Destination Reached') && onCompleteRide) { 
       return (
         <Button onClick={() => onCompleteRide(id)} size="sm" className="w-full">
           <Flag className="mr-2 h-4 w-4" /> Complete Ride
         </Button>
       );
     }
-    // Driver can cancel their *own* ride if it's scheduled or about to depart (for current ride or upcoming)
     if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route')) { 
-       if(onCancelReservation) { // onCancelReservation here means driver cancelling the whole ride
+       if(onCancelReservation) { 
          return (
            <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full">
               <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
@@ -199,10 +196,18 @@ export function RideCard({
 
         {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (currentUser && (passengerIsOnThisRide || ride.driverId === currentUser.id)) && (
           <div className="grid grid-cols-2 gap-2 pt-2">
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => toast({ title: "Simulated Call", description: `Calling ${isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}... (Simulated)` })}
+            >
               <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}
             </Button>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => toast({ title: "Simulated Chat", description: `Opening chat with ${isPassenger ? (driverName || 'Driver') : 'Passenger(s)'}... (Simulated)` })}
+            >
               <MessageSquare className="mr-2 h-4 w-4" /> Chat
             </Button>
           </div>
@@ -213,9 +218,6 @@ export function RideCard({
         {isPassenger && renderPassengerActions()}
         {isDriver && renderDriverActions()}
         
-        {/* View Details Button Logic */}
-        {/* Show if not a current ride, OR if it's a current ride but passenger is not on it and it's reservable */}
-        {/* OR if it's a requested ride and the current user is the requester */}
         {onViewDetails && (
             (!isCurrentRide) ||
             (isCurrentRide && isPassenger && !passengerIsOnThisRide && status === 'Scheduled' && seatsAvailable > 0) ||
