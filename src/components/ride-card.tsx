@@ -4,9 +4,10 @@ import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, ShieldAlert, Check, CircleDot, Hourglass, Car } from 'lucide-react';
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, ShieldAlert, Check, CircleDot, Hourglass, Car, Label } from 'lucide-react';
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 
 interface RideCardProps {
   ride: Ride;
@@ -117,7 +118,7 @@ export function RideCard({
         </Button>
       );
     }
-    if (isCurrentRide) {
+    if (isCurrentRide && (status === 'Scheduled' || status === 'About to Depart' || status === 'On Route' )) { // Ensure driver can only cancel their *own* current ride
        return (
          <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full"> {/* Driver cancelling whole ride */}
             <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
@@ -145,7 +146,7 @@ export function RideCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="p-4 space-y-3">
-        {isCurrentRide && isPassenger && (
+        {isCurrentRide && (isPassenger || isDriver) && (ride.status === 'On Route' || ride.status === 'Arriving' || ride.status === 'At Source' || ride.status === 'Waiting' || ride.status === 'Destination Reached') && (
           <div className="space-y-2">
             <Label className="text-xs font-semibold text-muted-foreground">RIDE PROGRESS</Label>
             <div className="flex items-center space-x-2 text-sm">
@@ -172,7 +173,7 @@ export function RideCard({
           )}
         </div>
 
-        {isCurrentRide && (
+        {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart') && (
           <div className="grid grid-cols-2 gap-2 pt-2">
             <Button variant="outline" size="sm">
               <Phone className="mr-2 h-4 w-4" /> Call {isPassenger ? 'Driver' : 'Passenger(s)'}
@@ -187,7 +188,7 @@ export function RideCard({
       <CardFooter className="p-4 bg-secondary/30 space-y-2 flex flex-col">
         {isPassenger && renderPassengerActions()}
         {isDriver && renderDriverActions()}
-        {onViewDetails && !isCurrentRide && status !== 'Requested' && (
+        {onViewDetails && !isCurrentRide && (status !== 'Requested' || isPassenger) && ( // Allow passenger to view details of their requested ride
           <Button onClick={() => onViewDetails(id)} variant="link" size="sm" className="w-full text-primary">
             View Details
           </Button>
