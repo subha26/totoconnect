@@ -4,7 +4,8 @@ import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, ShieldAlert, Check, CircleDot, Hourglass, Car, Label } from 'lucide-react';
+import { Label } from '@/components/ui/label'; // Corrected import
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, ShieldAlert, Check, CircleDot, Hourglass, Car } from 'lucide-react'; // Removed Label from here
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
