@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react'; // Import React and useState
@@ -65,7 +64,8 @@ export default function PassengerHomePage() {
 
   // Filter available rides: scheduled, not full, and passenger is not already on it.
   const availableRides = currentUser ? allRides.filter(ride => 
-    ride.status === 'Scheduled' && 
+    ride.status === 'Scheduled' && // Must be scheduled to be bookable
+    ride.status !== 'Cancelled' && // Explicitly ensure it's not cancelled
     ride.seatsAvailable > 0 &&
     !ride.passengers.find(p => p.userId === currentUser.id) &&
     ride.driverId !== currentUser.id // Passenger cannot reserve their own ride if they are also a driver
