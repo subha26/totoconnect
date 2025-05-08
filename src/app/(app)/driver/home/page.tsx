@@ -9,11 +9,23 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Bell, ShieldAlert, Car, Users, MessageSquare, Phone } from 'lucide-react';
+import { PlusCircle, Bell, ShieldAlert, Car, Users, MessageSquare, Phone, Edit, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 export default function DriverHomePage() {
   const router = useRouter();
@@ -24,13 +36,15 @@ export default function DriverHomePage() {
     isLoading: ridesLoading, 
     updateRideStatus,
     acceptRideRequest,
-    currentDriverRide
+    currentDriverRide,
+    deleteRide // Added deleteRide from context
   } = useRides();
   const { toast } = useToast();
 
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatRideId, setChatRideId] = useState<string | null>(null);
   const [chatModalTitle, setChatModalTitle] = useState("");
+  const [rideToDelete, setRideToDelete] = useState<string | null>(null);
 
   const handleOpenChatModal = (rideId: string, title: string) => {
     setChatRideId(rideId);
@@ -39,7 +53,7 @@ export default function DriverHomePage() {
   };
 
   const handleStartRide = async (rideId: string) => {
-    const success = await updateRideStatus(rideId, 'On Route', 10); // Start with 10% progress
+    const success = await updateRideStatus(rideId, 'On Route', 10); 
     if (success) {
       toast({ title: "Ride Started!", description: "The ride is now on route." });
     } else {
@@ -65,11 +79,34 @@ export default function DriverHomePage() {
     }
   };
 
+  const handleEditRide = (rideId: string) => {
+    router.push(`/driver/edit-ride/${rideId}`);
+  };
+
+  const confirmDeleteRide = async () => {
+    if (rideToDelete) {
+      const success = await deleteRide(rideToDelete);
+      if (success) {
+        toast({ title: "Ride Deleted", description: "The ride has been successfully removed." });
+      } else {
+        toast({ title: "Deletion Failed", description: "Could not delete the ride. Please try again.", variant: "destructive" });
+      }
+      setRideToDelete(null); // Close dialog
+    }
+  };
+  
+  const handleDeleteRide = (rideId: string) => {
+    setRideToDelete(rideId); // Open confirmation dialog
+  };
+
+
   // Simulate ride progress for current active ride
   // In a real app, this would come from GPS updates
   const activeRide = currentDriverRide;
   
   if (activeRide && activeRide.status === 'On Route') {
+      // This interval setup might be problematic with React's lifecycle and Next.js.
+      // Consider moving progress updates to be triggered by real events or a more robust polling mechanism if needed.
       const intervalId = setInterval(() => {
         if (activeRide.progress === undefined || activeRide.progress >= 100) {
             clearInterval(intervalId);
@@ -81,9 +118,6 @@ export default function DriverHomePage() {
         const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
         updateRideStatus(activeRide.id, 'On Route', newProgress);
       }, 5000); // Update every 5 seconds
-
-      // useEffect cleanup - This could be problematic in some Next.js strict mode setups
-      // return () => clearInterval(intervalId); 
   }
 
 
@@ -146,6 +180,8 @@ export default function DriverHomePage() {
                   onStartRide={handleStartRide}
                   onViewDetails={() => router.push(`/ride/${ride.id}`)}
                   onOpenChat={handleOpenChatModal}
+                  onEditRide={handleEditRide}
+                  onDeleteRide={handleDeleteRide}
                 />
               ))}
             </div>
@@ -177,7 +213,6 @@ export default function DriverHomePage() {
                     userRole="driver" 
                     onAcceptRequest={handleAcceptRequest}
                     onViewDetails={() => router.push(`/ride/${ride.id}`)}
-                    // No chat for mere requests yet, only for confirmed/active rides
                     />
                 ))}
                 </div>
@@ -199,6 +234,24 @@ export default function DriverHomePage() {
           chatTitle={chatModalTitle}
           currentUser={currentUser}
         />
+      )}
+      {rideToDelete && (
+        <AlertDialog open={!!rideToDelete} onOpenChange={() => setRideToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the ride.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setRideToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteRide} className="bg-destructive hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

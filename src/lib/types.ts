@@ -4,10 +4,10 @@ import type { Timestamp } from 'firebase/firestore';
 export type UserRole = 'passenger' | 'driver' | null;
 
 export interface User {
-  id: string; // Corresponds to Firebase Auth UID or phone number for PIN-based
+  id: string; 
   phoneNumber: string;
   name: string;
-  pin: string; // In a real app, this should be hashed and not directly compared (or use Firebase Auth for full session management)
+  pin: string; 
   role: UserRole;
 }
 
@@ -21,7 +21,7 @@ export type RideStatus =
   | 'At Source'
   | 'Waiting'
   | 'Destination Reached'
-  | 'Requested'; // For passenger requests
+  | 'Requested'; 
 
 export interface RidePassenger {
   userId: string;
@@ -29,13 +29,11 @@ export interface RidePassenger {
   phoneNumber: string;
 }
 
-// This interface represents the Ride object as used on the client-side,
-// where departureTime is an ISO string.
 export interface Ride {
-  id: string; // Firestore document ID
+  id: string; 
   origin: string;
   destination: string;
-  departureTime: string; // ISO string for client-side use
+  departureTime: string; 
   seatsAvailable: number;
   totalSeats: number;
   status: RideStatus;
@@ -45,20 +43,32 @@ export interface Ride {
   passengers: RidePassenger[];
   currentLatitude?: number;
   currentLongitude?: number;
-  progress?: number; // 0-100
-  requestedBy?: string; // passengerId for requested rides
+  progress?: number; 
+  requestedBy?: string; 
 }
 
-// This interface can be used when preparing data for Firestore,
-// where departureTime is a Firestore Timestamp.
-export interface RideFirestoreData extends Omit<Ride, 'id' | 'departureTime'> {
-  departureTime: Timestamp;
+export interface RideFirestoreData {
+  origin?: string;
+  destination?: string;
+  departureTime?: Timestamp;
+  seatsAvailable?: number;
+  totalSeats?: number;
+  status?: RideStatus;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhoneNumber?: string;
+  passengers?: RidePassenger[];
+  currentLatitude?: number;
+  currentLongitude?: number;
+  progress?: number;
+  requestedBy?: string;
 }
+
 
 export interface ChatMessage {
-  id: string; // Firestore document ID
+  id: string; 
   senderId: string;
   senderName: string;
   text: string;
-  timestamp: Timestamp; // Firestore Timestamp for ordering
+  timestamp: Timestamp; 
 }

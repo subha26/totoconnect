@@ -27,14 +27,15 @@ import {
 interface RideContextType {
   rides: Ride[];
   isLoading: boolean;
-  // fetchRides: () => void; // Replaced by real-time listener
   requestRide: (departureTime: Date, origin: string, destination: string) => Promise<string | null>;
   reserveSeat: (rideId: string) => Promise<boolean>;
   cancelReservation: (rideId: string) => Promise<boolean>;
   postRide: (departureTime: Date, origin: string, destination: string, totalSeats: number) => Promise<string | null>;
   updateRideStatus: (rideId: string, status: RideStatus, progress?: number) => Promise<boolean>;
   acceptRideRequest: (rideId: string) => Promise<boolean>;
-  getRideById: (rideId: string) => Ride | undefined; // Still useful for synchronous access if needed
+  getRideById: (rideId: string) => Ride | undefined;
+  updateRideDetails: (rideId: string, details: Partial<RideFirestoreData>) => Promise<boolean>;
+  deleteRide: (rideId: string) => Promise<boolean>;
   passengerUpcomingRides: Ride[];
   passengerPastRides: Ride[];
   driverUpcomingRides: Ride[];
@@ -64,8 +65,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         fetchedRides.push({ 
           ...data, 
           id: doc.id,
-          // Convert Firestore Timestamp to ISO string if necessary, or Date object
-          // Assuming departureTime is stored as Firestore Timestamp
           departureTime: (data.departureTime as Timestamp).toDate().toISOString(),
         } as Ride);
       });
@@ -76,7 +75,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on unmount
+    return () => unsubscribe();
   }, []);
 
 
@@ -84,18 +83,17 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser || currentUser.role !== 'passenger') return null;
     setIsLoading(true);
     try {
-      const newRideData = {
+      const newRideData: Partial<RideFirestoreData> = { // Use RideFirestoreData for consistency
         origin,
         destination,
         departureTime: Timestamp.fromDate(departureTime),
-        seatsAvailable: DEFAULT_TOTAL_SEATS, // Placeholder, driver might set this upon acceptance or offer fixed
+        seatsAvailable: DEFAULT_TOTAL_SEATS, 
         totalSeats: DEFAULT_TOTAL_SEATS,
         status: 'Requested' as RideStatus,
         driverId: null,
-        passengers: [], // Passenger will be added upon driver acceptance if they are the requester
+        passengers: [], 
         requestedBy: currentUser.id,
         progress: 0,
-        // Add currentLatitude, currentLongitude if available from passenger
       };
       const docRef = await addDoc(collection(db, RIDES_COLLECTION), newRideData);
       setIsLoading(false);
@@ -120,7 +118,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       const rideData = rideSnap.data() as Ride;
       if (rideData.seatsAvailable <= 0 || rideData.passengers.find(p => p.userId === currentUser.id)) {
         setIsLoading(false);
-        return false; // No seats or already reserved
+        return false; 
       }
 
       await updateDoc(rideRef, {
@@ -151,7 +149,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
 
       if (!passengerToRemove) {
          setIsLoading(false);
-         return false; // Passenger not on this ride
+         return false; 
       }
 
       await updateDoc(rideRef, {
@@ -171,7 +169,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser || currentUser.role !== 'driver') return null;
     setIsLoading(true);
     try {
-      const newRideData = {
+      const newRideData: Partial<RideFirestoreData> = {
         origin,
         destination,
         departureTime: Timestamp.fromDate(departureTime),
@@ -183,7 +181,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         driverPhoneNumber: currentUser.phoneNumber,
         passengers: [],
         progress: 0,
-        // Add driver's currentLatitude, currentLongitude if starting immediately
       };
       const docRef = await addDoc(collection(db, RIDES_COLLECTION), newRideData);
       setIsLoading(false);
@@ -203,7 +200,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       if (progress !== undefined) {
         updateData.progress = progress;
       }
-      // Add logic for currentLatitude, currentLongitude updates if status is 'On Route'
       await updateDoc(rideRef, updateData);
       setIsLoading(false);
       return true;
@@ -227,10 +223,9 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       const rideData = rideSnap.data() as Ride;
       if (rideData.status !== 'Requested' || !rideData.requestedBy) {
          setIsLoading(false);
-         return false; // Not a valid request or no requester
+         return false; 
       }
 
-      // Fetch requester's details to add them as a passenger
       const requesterUserDoc = await getDoc(doc(db, "users", rideData.requestedBy));
       if (!requesterUserDoc.exists()) {
         setIsLoading(false);
@@ -245,12 +240,54 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         driverName: currentUser.name,
         driverPhoneNumber: currentUser.phoneNumber,
         passengers: arrayUnion({ userId: requesterUserData.id, name: requesterUserData.name, phoneNumber: requesterUserData.phoneNumber }),
-        seatsAvailable: rideData.totalSeats - 1, // Assuming request is for 1 seat
+        seatsAvailable: rideData.totalSeats - 1, 
       });
       setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error accepting ride request: ", error);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  const updateRideDetails = async (rideId: string, details: Partial<RideFirestoreData>): Promise<boolean> => {
+    if (!currentUser || currentUser.role !== 'driver') return false;
+    setIsLoading(true);
+    const rideRef = doc(db, RIDES_COLLECTION, rideId);
+    try {
+      // Ensure the driver owns this ride before updating (optional, but good practice)
+      const rideSnap = await getDoc(rideRef);
+      if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
+        setIsLoading(false);
+        return false;
+      }
+      await updateDoc(rideRef, details);
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error updating ride details:", error);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  const deleteRide = async (rideId: string): Promise<boolean> => {
+    if (!currentUser || currentUser.role !== 'driver') return false;
+    setIsLoading(true);
+    const rideRef = doc(db, RIDES_COLLECTION, rideId);
+    try {
+      // Ensure the driver owns this ride before deleting (optional, but good practice)
+      const rideSnap = await getDoc(rideRef);
+      if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
+        setIsLoading(false);
+        return false; // Or throw an error indicating permission denied
+      }
+      await deleteDoc(rideRef);
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error deleting ride: ", error);
       setIsLoading(false);
       return false;
     }
@@ -281,7 +318,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   const driverRideRequests = rides.filter(ride => ride.status === 'Requested' && currentUser?.role === 'driver')
     .sort((a,b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
 
-  const activeStatuses: RideStatus[] = ['About to Depart', 'On Route', 'Arriving', 'At Source', 'Waiting'];
+  const activeStatuses: RideStatus[] = ['About to Depart', 'On Route', 'Arriving', 'At Source', 'Waiting', 'Destination Reached'];
   
   const currentPassengerRide = rides.find(ride => 
       currentUser && ride.passengers.some(p => p.userId === currentUser.id) && activeStatuses.includes(ride.status)
@@ -295,6 +332,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   return (
     <RideContext.Provider value={{ 
         rides, isLoading, requestRide, reserveSeat, cancelReservation, postRide, updateRideStatus, acceptRideRequest, getRideById,
+        updateRideDetails, deleteRide,
         passengerUpcomingRides, passengerPastRides, driverUpcomingRides, driverPastRides, driverRideRequests,
         currentPassengerRide, currentDriverRide
       }}>
@@ -310,3 +348,22 @@ export const useRides = (): RideContextType => {
   }
   return context;
 };
+
+// Partial<RideFirestoreData> is used for updateRideDetails
+// to allow updating only specific fields of the ride.
+export interface RideFirestoreData {
+  origin?: string;
+  destination?: string;
+  departureTime?: Timestamp;
+  seatsAvailable?: number;
+  totalSeats?: number;
+  status?: RideStatus;
+  driverId?: string | null;
+  driverName?: string;
+  driverPhoneNumber?: string;
+  passengers?: RidePassenger[];
+  currentLatitude?: number;
+  currentLongitude?: number;
+  progress?: number;
+  requestedBy?: string;
+}
