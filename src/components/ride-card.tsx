@@ -4,7 +4,7 @@
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+// import { Progress } from '@/components/ui/progress'; // Removed Progress import
 import { Label } from '@/components/ui/label';
 import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car } from 'lucide-react';
 import { format } from 'date-fns';
@@ -61,7 +61,7 @@ export function RideCard({
 }: RideCardProps) {
   const { currentUser } = useAuth(); 
   const { toast } = useToast();
-  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers, progress } = ride;
+  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers } = ride; // Removed progress from destructuring as it's no longer used here
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
@@ -70,15 +70,15 @@ export function RideCard({
 
   const handleCall = () => {
     let phoneNumberToCall = '';
-    let contactName = '';
+    // let contactName = ''; // contactName was not used
 
     if (isPassenger && driverPhoneNumber) {
       phoneNumberToCall = driverPhoneNumber;
-      contactName = driverName || 'Driver';
+      // contactName = driverName || 'Driver';
     } else if (isDriver && currentUser && ride.driverId === currentUser.id) {
       if (passengers.length > 0 && passengers[0].phoneNumber) {
         phoneNumberToCall = passengers[0].phoneNumber;
-        contactName = passengers[0].name || 'Passenger';
+        // contactName = passengers[0].name || 'Passenger';
       } else {
         toast({ title: "No passenger to call", description: "There are no passengers on this ride yet.", variant: "default" });
         return;
@@ -208,16 +208,7 @@ export function RideCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="p-4 space-y-3">
-        {isCurrentRide && (isPassenger || (isDriver && currentUser && ride.driverId === currentUser.id )) && (ride.status === 'On Route' || ride.status === 'Arriving' || ride.status === 'At Source' || ride.status === 'Waiting' || ride.status === 'Destination Reached') && (
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-muted-foreground">RIDE PROGRESS</Label>
-            <div className="flex items-center space-x-2 text-sm">
-              <MapPin className="h-4 w-4 text-primary" /> <span>{origin}</span>
-              <Progress value={progress || 0} className="flex-1 h-2" />
-              <MapPin className="h-4 w-4 text-primary" /> <span>{destination}</span>
-            </div>
-          </div>
-        )}
+        {/* Removed Ride Progress Bar section */}
         
         {isPassenger && driverName && (
           <p className="text-sm flex items-center"><Car className="mr-2 h-4 w-4 text-muted-foreground" /> Driver: {driverName}</p>
@@ -277,3 +268,4 @@ export function RideCard({
     </Card>
   );
 }
+

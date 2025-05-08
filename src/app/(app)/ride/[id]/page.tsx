@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context';
 import type { Ride } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+// import { Progress } from '@/components/ui/progress'; // Removed Progress import
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
@@ -64,7 +64,7 @@ export default function RideDetailPage() {
           <CardContent className="space-y-3">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-4 w-full" />
+            {/* <Skeleton className="h-4 w-full" /> Removed skeleton for progress bar area */}
           </CardContent>
           <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
         </Card>
@@ -133,13 +133,13 @@ export default function RideDetailPage() {
   };
 
   const handleStart = async () => {
-    const success = await updateRideStatus(ride.id, 'On Route', 10);
+    const success = await updateRideStatus(ride.id, 'On Route', 10); // Progress value might be vestigial now
     if (success) toast({ title: "Ride Started!" }); else toast({ title: "Failed to Start Ride", variant: "destructive" });
     setRide(getRideById(rideId));
   };
 
   const handleComplete = async () => {
-    const success = await updateRideStatus(ride.id, 'Completed', 100);
+    const success = await updateRideStatus(ride.id, 'Completed', 100); // Progress value might be vestigial now
     if (success) toast({ title: "Ride Completed!" }); else toast({ title: "Failed to Complete Ride", variant: "destructive" });
     setRide(getRideById(rideId));
   };
@@ -179,16 +179,18 @@ export default function RideDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          {ride.status === 'On Route' && (
+          {/* Ride Progress Bar section removed */}
+          {/* {ride.status === 'On Route' && (
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-muted-foreground">RIDE PROGRESS</Label>
               <div className="flex items-center space-x-3 text-sm">
                 <MapPin className="h-5 w-5 text-primary" /> <span className="truncate w-1/3">{ride.origin}</span>
-                <Progress value={ride.progress || 0} className="flex-1 h-3" />
+                // Progress component was here
                 <MapPin className="h-5 w-5 text-primary" /> <span className="truncate w-1/3 text-right">{ride.destination}</span>
               </div>
             </div>
-          )}
+          )} */}
+
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-3">
@@ -280,3 +282,4 @@ export default function RideDetailPage() {
     </div>
   );
 }
+
