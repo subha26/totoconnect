@@ -9,7 +9,7 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Bell, ShieldAlert, Car, Users, MessageSquare, Phone, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Bell, Car, Users, MessageSquare, Phone, Edit, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -139,10 +139,7 @@ export default function DriverHomePage() {
     <div className="container mx-auto p-4 space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-primary">Driver Dashboard</h1>
-         <Button variant="ghost" size="icon" onClick={() => router.push('/emergency')}>
-          <ShieldAlert className="h-6 w-6 text-destructive" />
-          <span className="sr-only">Emergency</span>
-        </Button>
+         {/* Emergency button removed */}
       </header>
 
       {activeRide && (

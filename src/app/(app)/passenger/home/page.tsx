@@ -8,7 +8,7 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, ShieldAlert, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare } from 'lucide-react';
+import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare } from 'lucide-react';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,10 +89,7 @@ export default function PassengerHomePage() {
     <div className="container mx-auto p-4 space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-primary">Welcome, {currentUser.name}!</h1>
-        <Button variant="ghost" size="icon" onClick={() => router.push('/emergency')}>
-          <ShieldAlert className="h-6 w-6 text-destructive" />
-          <span className="sr-only">Emergency</span>
-        </Button>
+        {/* Emergency button removed */}
       </header>
 
       {currentPassengerRide && (
