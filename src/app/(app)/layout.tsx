@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from 'react';
@@ -5,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { BottomNav } from '@/components/bottom-nav';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UserProfileDropdown } from '@/components/user-profile-dropdown'; // Import the new component
+import { AppHeader } from '@/components/app-header'; // Import the new AppHeader component
 
 export default function AppLayout({
   children,
@@ -32,13 +33,11 @@ export default function AppLayout({
   if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen">
-        <header className="p-4 border-b">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-10 w-10 rounded-full" /> {/* Placeholder for UserProfileDropdown */}
-            <Skeleton className="h-8 w-32" />
-          </div>
+        <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-card shadow-md flex items-center justify-between px-4 md:px-6">
+          <Skeleton className="h-8 w-32" /> {/* Placeholder for App Name */}
+          <Skeleton className="h-10 w-10 rounded-full" /> {/* Placeholder for UserProfileDropdown Avatar */}
         </header>
-        <main className="flex-grow p-4 pt-16"> {/* Added pt-16 for UserProfileDropdown space */}
+        <main className="flex-grow p-4 pt-20"> {/* pt-16 for header + some space */}
           <Skeleton className="h-24 w-full mb-4" />
           <Skeleton className="h-16 w-full" />
         </main>
@@ -55,8 +54,8 @@ export default function AppLayout({
 
   return (
     <div className="flex flex-col min-h-screen">
-      <UserProfileDropdown /> {/* Add the UserProfileDropdown here */}
-      <main className="flex-grow pb-20 pt-16"> {/* Added pt-16 for UserProfileDropdown space, padding-bottom for BottomNav */}
+      <AppHeader /> {/* Add the AppHeader here */}
+      <main className="flex-grow pb-20 pt-20"> {/* Added pt-20 for AppHeader (h-16) + some space, padding-bottom for BottomNav */}
         {children}
       </main>
       <BottomNav />
