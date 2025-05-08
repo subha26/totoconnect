@@ -164,7 +164,7 @@ export default function RideDetailPage() {
               </CardTitle>
               <CardDescription className="text-sm text-muted-foreground flex items-center">
                 <Clock className="mr-2 h-4 w-4" />
-                {format(new Date(ride.departureTime), "PPpp")}
+                {format(new Date(ride.departureTime), "PPp")}
               </CardDescription>
             </div>
             <span className={`px-3 py-1 text-xs font-semibold rounded-full text-white ${

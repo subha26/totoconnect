@@ -229,7 +229,7 @@ export function RideCard({
         </div>
         <CardDescription className="text-sm text-muted-foreground flex items-center">
           <Clock className="mr-2 h-4 w-4" />
-          {format(new Date(departureTime), "PPpp")}
+          {format(new Date(departureTime), "PPp")}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-4 space-y-3">
@@ -292,3 +292,4 @@ export function RideCard({
     </Card>
   );
 }
+
