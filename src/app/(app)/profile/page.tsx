@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label'; 
+// Removed Label import as it's no longer directly used for Role in the new structure
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { UserRole } from '@/lib/types';
 
@@ -98,23 +98,26 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          <div className="space-y-2">
-            {/* Label removed, styling moved to SelectTrigger */}
-            <Select
-                value={currentUser.role || ''} 
-                onValueChange={handleRoleChange}
-            >
-                <SelectTrigger id="role-select" className="w-full font-semibold"> {/* Added font-semibold */}
-                    <div className="flex items-center gap-2">
-                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" />
+          <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
+            <Briefcase className="h-6 w-6 text-primary" />
+            <div className="w-full">
+                <p className="text-xs text-muted-foreground">Role</p>
+                <Select
+                    value={currentUser.role || ''} 
+                    onValueChange={handleRoleChange}
+                >
+                    <SelectTrigger 
+                        id="role-select" 
+                        className="w-full font-semibold border-none bg-transparent p-0 h-auto shadow-none focus:ring-0 focus:ring-offset-0 text-left text-foreground hover:bg-transparent data-[state=open]:bg-transparent"
+                    >
                         <SelectValue placeholder="Select role" />
-                    </div>
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="passenger" className="font-semibold">Passenger</SelectItem>
-                    <SelectItem value="driver" className="font-semibold">Driver</SelectItem>
-                </SelectContent>
-            </Select>
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="passenger" className="font-semibold">Passenger</SelectItem>
+                        <SelectItem value="driver" className="font-semibold">Driver</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
           </div>
           
           <Button onClick={logout} variant="destructive" className="w-full text-lg py-3 mt-4">
