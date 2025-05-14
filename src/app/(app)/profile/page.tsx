@@ -107,7 +107,7 @@ export default function ProfilePage() {
             >
                 <SelectTrigger id="role-select" className="w-full">
                     <div className="flex items-center gap-2">
-                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" />
+                        <Briefcase className="h-6 w-6 text-primary flex-shrink-0" />
                         <SelectValue placeholder="Select role" />
                     </div>
                 </SelectTrigger>
