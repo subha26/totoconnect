@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-// Label import removed as it's no longer used for the role field directly
+import { Label } from '@/components/ui/label'; // Re-import Label
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { UserRole } from '@/lib/types';
 
@@ -100,14 +100,14 @@ export default function ProfilePage() {
           </div>
           
           <div className="space-y-2">
-            {/* Label removed from here */}
+            <Label htmlFor="role-select">Role</Label> 
             <Select
                 value={currentUser.role || ''} 
                 onValueChange={handleRoleChange}
             >
                 <SelectTrigger id="role-select" className="w-full">
                     <div className="flex items-center gap-2">
-                        <Briefcase className="h-6 w-6 text-primary flex-shrink-0" />
+                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" /> {/* Adjusted icon size slightly */}
                         <SelectValue placeholder="Select role" />
                     </div>
                 </SelectTrigger>
