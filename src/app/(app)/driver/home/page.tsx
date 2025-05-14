@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react'; // Import React and useState
+import React, { useState, useEffect } from 'react'; // Import React, useState, and useEffect
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -111,12 +111,18 @@ export default function DriverHomePage() {
             if (activeRide.progress === undefined || activeRide.progress >= 100) {
                 if (intervalId) clearInterval(intervalId);
                 if(activeRide.progress >=100 && activeRide.status !== 'Completed') {
-                updateRideStatus(activeRide.id, 'Destination Reached', 100);
+                // Check if updateRideStatus is defined before calling
+                if (typeof updateRideStatus === 'function') {
+                    updateRideStatus(activeRide.id, 'Destination Reached', 100);
+                }
                 }
                 return;
             }
             const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
-            updateRideStatus(activeRide.id, 'On Route', newProgress);
+            // Check if updateRideStatus is defined before calling
+            if (typeof updateRideStatus === 'function') {
+                updateRideStatus(activeRide.id, 'On Route', newProgress);
+            }
         }, 5000); // Update every 5 seconds
     }
     return () => {
