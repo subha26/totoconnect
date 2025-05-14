@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label'; // Re-import Label
+import { Label } from '@/components/ui/label'; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { UserRole } from '@/lib/types';
 
@@ -49,14 +49,13 @@ export default function ProfilePage() {
   };
 
   const handleRoleChange = async (newRoleValue: string) => {
-    const newRole = newRoleValue as UserRole; // Cast string from Select to UserRole
+    const newRole = newRoleValue as UserRole; 
     if (!currentUser || !newRole) return;
     if (newRole === currentUser.role) return; 
 
     const success = await updateUserRole(newRole);
     if (success) {
         toast({ title: "Role Updated", description: `You are now a ${newRole}. Your view may update.` });
-        // AppLayout should handle redirection if the current route is no longer valid for the new role.
     } else {
         toast({ title: "Update Failed", description: "Could not update your role.", variant: "destructive" });
     }
@@ -95,19 +94,19 @@ export default function ProfilePage() {
             <Phone className="h-6 w-6 text-primary" />
             <div>
                 <p className="text-xs text-muted-foreground">Phone Number</p>
-                <p className="font-medium text-foreground">{currentUser.phoneNumber}</p>
+                <p className="font-semibold text-foreground">{currentUser.phoneNumber}</p>
             </div>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="role-select">Role</Label> 
+            {/* Label removed, styling moved to SelectTrigger */}
             <Select
                 value={currentUser.role || ''} 
                 onValueChange={handleRoleChange}
             >
-                <SelectTrigger id="role-select" className="w-full">
+                <SelectTrigger id="role-select" className="w-full font-semibold"> {/* Added font-semibold */}
                     <div className="flex items-center gap-2">
-                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" /> {/* Adjusted icon size slightly */}
+                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" />
                         <SelectValue placeholder="Select role" />
                     </div>
                 </SelectTrigger>
