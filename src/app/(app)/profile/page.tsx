@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label';
+// Label import removed as it's no longer used for the role field directly
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { UserRole } from '@/lib/types';
 
@@ -100,20 +100,20 @@ export default function ProfilePage() {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="role-select" className="flex items-center text-xs text-muted-foreground mb-1">
-                <Briefcase className="mr-2 h-5 w-5 text-primary" />
-                Role
-            </Label>
+            {/* Label removed from here */}
             <Select
-                value={currentUser.role || ''} // Ensure value is not null for Select
+                value={currentUser.role || ''} 
                 onValueChange={handleRoleChange}
             >
                 <SelectTrigger id="role-select" className="w-full">
-                    <SelectValue placeholder="Select role" />
+                    <div className="flex items-center gap-2">
+                        <Briefcase className="h-5 w-5 text-primary flex-shrink-0" />
+                        <SelectValue placeholder="Select role" />
+                    </div>
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="passenger">Passenger</SelectItem>
-                    <SelectItem value="driver">Driver</SelectItem>
+                    <SelectItem value="passenger" className="font-semibold">Passenger</SelectItem>
+                    <SelectItem value="driver" className="font-semibold">Driver</SelectItem>
                 </SelectContent>
             </Select>
           </div>
