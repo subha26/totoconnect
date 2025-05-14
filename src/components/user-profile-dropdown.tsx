@@ -37,13 +37,15 @@ export function UserProfileDropdown() {
     logout();
   };
 
+  const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="rounded-full w-10 h-10 p-0">
           <Avatar className="w-9 h-9">
             <AvatarImage 
-              src={`https://i.pravatar.cc/150?u=${currentUser.id}`} 
+              src={avatarSrc} 
               alt={currentUser.name} 
               data-ai-hint="user avatar placeholder" 
             />
@@ -76,3 +78,4 @@ export function UserProfileDropdown() {
     </DropdownMenu>
   );
 }
+

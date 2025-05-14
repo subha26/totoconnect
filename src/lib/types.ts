@@ -9,6 +9,7 @@ export interface User {
   name: string;
   pin: string; 
   role: UserRole;
+  profileImageVersion?: number; // Added for changing profile picture
 }
 
 export type RideStatus =
@@ -72,3 +73,4 @@ export interface ChatMessage {
   text: string;
   timestamp: Timestamp; 
 }
+

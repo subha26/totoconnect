@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from 'next/navigation';
@@ -5,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Phone, Briefcase, LogOut, Edit3 } from 'lucide-react';
+import { User, Phone, Briefcase, LogOut, Edit3, Camera } from 'lucide-react'; // Added Camera
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 export default function ProfilePage() {
-  const { currentUser, logout, isLoading } = useAuth();
+  const { currentUser, logout, isLoading, changeProfilePicture } = useAuth();
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast
 
   if (isLoading || !currentUser) {
     return (
@@ -36,15 +39,35 @@ export default function ProfilePage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   }
 
+  const handleChangePicture = async () => {
+    if (!currentUser) return;
+    await changeProfilePicture();
+    toast({ title: "Profile Picture Updated", description: "Your new avatar is being fetched." });
+  };
+
+  const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
+
   return (
     <div className="container mx-auto p-4">
        <h1 className="text-2xl font-semibold mb-6 text-primary text-center">My Profile</h1>
       <Card className="max-w-md mx-auto shadow-xl rounded-xl">
         <CardHeader className="items-center text-center border-b pb-6">
-          <Avatar className="w-24 h-24 mb-4 text-3xl border-2 border-primary">
-            <AvatarImage src={`https://i.pravatar.cc/150?u=${currentUser.id}`} alt={currentUser.name} data-ai-hint="user avatar placeholder" />
-            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(currentUser.name)}</AvatarFallback>
-          </Avatar>
+          <div className="relative w-24 h-24 mb-4">
+            <Avatar className="w-full h-full text-3xl border-2 border-primary">
+              <AvatarImage src={avatarSrc} alt={currentUser.name} data-ai-hint="user avatar placeholder" />
+              <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(currentUser.name)}</AvatarFallback>
+            </Avatar>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute bottom-0 right-0 rounded-full w-8 h-8 bg-card hover:bg-secondary border-primary/50 hover:border-primary"
+              onClick={handleChangePicture}
+              title="Change profile picture"
+            >
+              <Camera className="w-4 h-4 text-primary" />
+              <span className="sr-only">Change profile picture</span>
+            </Button>
+          </div>
           <CardTitle className="text-2xl font-bold text-foreground">{currentUser.name}</CardTitle>
           <CardDescription className="text-md text-muted-foreground">
             Your personal account details.
@@ -80,3 +103,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
