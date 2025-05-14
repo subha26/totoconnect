@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Phone, Briefcase, LogOut, Edit3, Camera } from 'lucide-react'; // Added Camera
+import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { UserRole } from '@/lib/types';
 
 export default function ProfilePage() {
-  const { currentUser, logout, isLoading, changeProfilePicture } = useAuth();
+  const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole } = useAuth();
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   if (isLoading || !currentUser) {
     return (
@@ -43,6 +46,20 @@ export default function ProfilePage() {
     if (!currentUser) return;
     await changeProfilePicture();
     toast({ title: "Profile Picture Updated", description: "Your new avatar is being fetched." });
+  };
+
+  const handleRoleChange = async (newRoleValue: string) => {
+    const newRole = newRoleValue as UserRole; // Cast string from Select to UserRole
+    if (!currentUser || !newRole) return;
+    if (newRole === currentUser.role) return; 
+
+    const success = await updateUserRole(newRole);
+    if (success) {
+        toast({ title: "Role Updated", description: `You are now a ${newRole}. Your view may update.` });
+        // AppLayout should handle redirection if the current route is no longer valid for the new role.
+    } else {
+        toast({ title: "Update Failed", description: "Could not update your role.", variant: "destructive" });
+    }
   };
 
   const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
@@ -82,19 +99,25 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
-            <Briefcase className="h-6 w-6 text-primary" />
-            <div>
-                <p className="text-xs text-muted-foreground">Role</p>
-                <p className="font-medium text-foreground capitalize">{currentUser.role}</p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="role-select" className="flex items-center text-xs text-muted-foreground mb-1">
+                <Briefcase className="mr-2 h-5 w-5 text-primary" />
+                Role
+            </Label>
+            <Select
+                value={currentUser.role || ''} // Ensure value is not null for Select
+                onValueChange={handleRoleChange}
+            >
+                <SelectTrigger id="role-select" className="w-full">
+                    <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="passenger">Passenger</SelectItem>
+                    <SelectItem value="driver">Driver</SelectItem>
+                </SelectContent>
+            </Select>
           </div>
           
-          {/* Future: Edit Profile Button */}
-          {/* <Button variant="outline" className="w-full">
-            <Edit3 className="mr-2 h-4 w-4" /> Edit Profile
-          </Button> */}
-
           <Button onClick={logout} variant="destructive" className="w-full text-lg py-3 mt-4">
             <LogOut className="mr-2 h-5 w-5" /> Logout
           </Button>
@@ -103,4 +126,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

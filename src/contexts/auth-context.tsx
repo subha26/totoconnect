@@ -10,7 +10,7 @@ import {
   onAuthStateChanged,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'; // Added updateDoc
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { TEST_PASSENGER_PHONE, TEST_PASSENGER_PIN, TEST_PASSENGER_NAME, TEST_DRIVER_PHONE, TEST_DRIVER_PIN, TEST_DRIVER_NAME } from '@/lib/constants';
 
 
@@ -20,7 +20,8 @@ interface AuthContextType {
   login: (phoneNumber: string, pin: string) => Promise<boolean>;
   logout: () => void;
   signup: (phoneNumber: string, name: string, pin: string, role: UserRole) => Promise<boolean>;
-  changeProfilePicture: () => Promise<void>; // New function
+  changeProfilePicture: () => Promise<void>;
+  updateUserRole: (newRole: UserRole) => Promise<boolean>; // Added for role update
   firebaseUser: import('firebase/auth').User | null; 
 }
 
@@ -44,8 +45,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setCurrentUser(appUser);
           localStorage.setItem('totoConnectUser', JSON.stringify(appUser));
         } else {
-          setCurrentUser(null);
-          localStorage.removeItem('totoConnectUser');
+          // This case might happen if user exists in Firebase Auth but not Firestore
+          // Attempt to load from localStorage, or clear if inconsistent
+          const storedUser = localStorage.getItem('totoConnectUser');
+          if (storedUser) {
+            const parsedStoredUser: User = JSON.parse(storedUser);
+            // A basic check to see if the localStorage user matches the Firebase Auth user
+            // This example assumes phone number is unique ID in Firestore for non-Firebase Auth users.
+            // For Firebase Auth users, uid is the key.
+            // If using phone number as ID for mock users:
+            // if (user.phoneNumber && parsedStoredUser.id === user.phoneNumber) {
+            //   setCurrentUser(parsedStoredUser);
+            // } else 
+            if (parsedStoredUser.id === user.uid) { // Assuming user.id in Firestore matches Firebase Auth uid
+                 setCurrentUser(parsedStoredUser);
+            } else {
+              setCurrentUser(null);
+              localStorage.removeItem('totoConnectUser');
+            }
+          } else {
+            setCurrentUser(null);
+            localStorage.removeItem('totoConnectUser');
+          }
         }
       } else {
         try {
@@ -70,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phoneNumber: string, pin: string): Promise<boolean> => {
     setIsLoading(true);
     try {
+      // Using phoneNumber as document ID for mock login
       const userDocRef = doc(db, "users", phoneNumber);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -114,6 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     try {
+      // Using phoneNumber as document ID for mock signup
       const userDocRef = doc(db, "users", phoneNumber); 
       const userDocSnap = await getDoc(userDocRef);
 
@@ -124,12 +147,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const newUser: User = {
-        id: phoneNumber, 
+        id: phoneNumber, // Using phone number as ID for mock system
         phoneNumber,
         name,
         pin, 
         role,
-        profileImageVersion: 0, // Initialize profile image version
+        profileImageVersion: 0,
       };
       
       await setDoc(userDocRef, newUser); 
@@ -163,9 +186,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (error) {
       console.error("Error changing profile picture:", error);
-      // Optionally, show a toast notification for the error
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const updateUserRole = async (newRole: UserRole): Promise<boolean> => {
+    if (!currentUser || !newRole) return false;
+    setIsLoading(true);
+    try {
+      const userDocRef = doc(db, "users", currentUser.id);
+      await updateDoc(userDocRef, { role: newRole });
+
+      setCurrentUser(prevUser => {
+        if (!prevUser) return null;
+        const updatedUser = { ...prevUser, role: newRole };
+        localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
+        return updatedUser;
+      });
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      setIsLoading(false);
+      return false;
     }
   };
   
@@ -186,7 +230,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await seedMockUser(passengerMockForDb);
       await seedMockUser(driverMockForDb);
     };
-    // seedMockUsers(); 
+    // seedMockUsers(); // Commented out to prevent re-seeding on every load, enable if needed for initial setup
   }, []);
 
 
@@ -197,7 +241,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       login, 
       logout, 
       signup,
-      changeProfilePicture, // Expose new function
+      changeProfilePicture,
+      updateUserRole, // Expose new function
       firebaseUser
     }}>
       {children}
@@ -212,4 +257,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
