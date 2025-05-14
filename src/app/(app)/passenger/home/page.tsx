@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react'; // Import React and useState
+import React, { useState, useMemo } from 'react'; // Import React, useState, useMemo
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,14 +63,36 @@ export default function PassengerHomePage() {
     // For example: ride.passengers[index].boarded = true
   };
 
-  // Filter available rides: scheduled, not full, and passenger is not already on it.
-  const availableRides = currentUser ? allRides.filter(ride => 
-    ride.status === 'Scheduled' && // Must be scheduled to be bookable
-    ride.status !== 'Cancelled' && // Explicitly ensure it's not cancelled
-    ride.seatsAvailable > 0 &&
-    !ride.passengers.find(p => p.userId === currentUser.id) &&
-    ride.driverId !== currentUser.id // Passenger cannot reserve their own ride if they are also a driver
-  ) : [];
+  // Filter and de-duplicate available rides
+  const availableRides = useMemo(() => {
+    if (!currentUser) return [];
+
+    // 1. Basic filtering criteria
+    const potentiallyAvailable = allRides.filter(ride => 
+      ride.status === 'Scheduled' &&
+      ride.status !== 'Cancelled' &&
+      ride.seatsAvailable > 0 &&
+      !ride.passengers.find(p => p.userId === currentUser.id) &&
+      ride.driverId !== currentUser.id
+    );
+
+    // 2. De-duplicate the potentially available rides
+    const uniqueRideOfferKeys = new Set<string>();
+    const deDuplicatedRides = potentiallyAvailable.filter(ride => {
+      // Key for uniqueness: driver, origin, destination, and full departure time.
+      const rideKey = `${ride.driverId}-${ride.origin}-${ride.destination}-${ride.departureTime}`;
+      if (!uniqueRideOfferKeys.has(rideKey)) {
+        uniqueRideOfferKeys.add(rideKey);
+        return true;
+      }
+      return false;
+    });
+    
+    // 3. Sort by departure time (soonest first)
+    return deDuplicatedRides.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
+
+  }, [allRides, currentUser]);
+
 
   if (ridesLoading || !currentUser) {
     return (
@@ -131,7 +154,7 @@ export default function PassengerHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-              <Image src="https://picsum.photos/seed/empty/300/200" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty state illustration" />
+              <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty state illustration" />
               <p className="text-muted-foreground">No scheduled rides available right now. Try requesting one!</p>
             </CardContent>
           </Card>

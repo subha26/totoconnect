@@ -186,7 +186,7 @@ export default function DriverHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-               <Image src="https://picsum.photos/seed/driverempty/300/200" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty road illustration" />
+               <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty road illustration" />
               <p className="text-muted-foreground">No upcoming rides scheduled. You can post one!</p>
             </CardContent>
           </Card>
@@ -217,7 +217,7 @@ export default function DriverHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-              <Image src="https://picsum.photos/seed/norequests/300/200" alt="No new requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty inbox illustration" />
+              <Image src="https://placehold.co/300x200.png" alt="No new requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty inbox illustration" />
               <p className="text-muted-foreground">No new ride requests at the moment.</p>
             </CardContent>
           </Card>

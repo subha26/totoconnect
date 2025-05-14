@@ -1,3 +1,4 @@
+
 "use client";
 
 import { RideCard } from "@/components/ride-card";
@@ -50,7 +51,7 @@ export default function DriverRequestsPage() {
           </div>
         ) : (
           <div className="text-center py-10">
-            <Image src="https://picsum.photos/seed/norequests2/300/200" alt="No pending requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty bell illustration" />
+            <Image src="https://placehold.co/300x200.png" alt="No pending requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty bell illustration" />
             <p className="text-muted-foreground">No pending ride requests at this time.</p>
           </div>
         )}

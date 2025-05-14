@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,7 +58,7 @@ export default function PassengerRidesPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                <Image src="https://picsum.photos/seed/norides/300/200" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar illustration" />
+                <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar illustration" />
                 <p className="text-muted-foreground">You have no upcoming rides.</p>
               </div>
             )}
@@ -73,7 +74,7 @@ export default function PassengerRidesPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                 <Image src="https://picsum.photos/seed/pastrides/300/200" alt="No past rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="archive box illustration"/>
+                 <Image src="https://placehold.co/300x200.png" alt="No past rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="archive box illustration"/>
                 <p className="text-muted-foreground">No ride history from the past week.</p>
               </div>
             )}
