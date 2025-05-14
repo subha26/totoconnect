@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Ride, RideStatus, User } from '@/lib/types';
+import type { Ride, RideStatus, User, RidePassenger } from '@/lib/types'; // Ensure RidePassenger is imported
 import { LOCATIONS, DEFAULT_TOTAL_SEATS } from '@/lib/constants';
 import { useAuth } from './auth-context';
 import { db } from '@/lib/firebase';
@@ -23,6 +23,7 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 interface RideContextType {
   rides: Ride[];
@@ -53,6 +54,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   const { currentUser } = useAuth();
   const [rides, setRides] = useState<Ride[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast(); // Initialize useToast
 
   useEffect(() => {
     setIsLoading(true);
@@ -83,7 +85,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser || currentUser.role !== 'passenger') return null;
     setIsLoading(true);
     try {
-      const newRideData: Partial<RideFirestoreData> = { // Use RideFirestoreData for consistency
+      const newRideData: Partial<RideFirestoreData> = { 
         origin,
         destination,
         departureTime: Timestamp.fromDate(departureTime),
@@ -168,7 +170,31 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   const postRide = async (departureTime: Date, origin: string, destination: string, totalSeats: number): Promise<string|null> => {
     if (!currentUser || currentUser.role !== 'driver') return null;
     setIsLoading(true);
+
     try {
+      // Check for existing identical rides
+      const ridesRef = collection(db, RIDES_COLLECTION);
+      const q = query(ridesRef, 
+        where("driverId", "==", currentUser.id),
+        where("origin", "==", origin),
+        where("destination", "==", destination),
+        where("departureTime", "==", Timestamp.fromDate(departureTime)),
+        where("status", "==", 'Scheduled') // Only check against active, scheduled rides
+      );
+
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        // Duplicate ride found
+        toast({
+          title: "Duplicate Ride",
+          description: "You have already posted an identical ride that is currently scheduled.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return null;
+      }
+
+      // No duplicate, proceed to post
       const newRideData: Partial<RideFirestoreData> = {
         origin,
         destination,
@@ -256,7 +282,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
-      // Ensure the driver owns this ride before updating (optional, but good practice)
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
         setIsLoading(false);
@@ -277,11 +302,10 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
-      // Ensure the driver owns this ride before deleting (optional, but good practice)
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
         setIsLoading(false);
-        return false; // Or throw an error indicating permission denied
+        return false; 
       }
       await deleteDoc(rideRef);
       setIsLoading(false);
@@ -349,8 +373,6 @@ export const useRides = (): RideContextType => {
   return context;
 };
 
-// Partial<RideFirestoreData> is used for updateRideDetails
-// to allow updating only specific fields of the ride.
 export interface RideFirestoreData {
   origin?: string;
   destination?: string;
@@ -361,7 +383,7 @@ export interface RideFirestoreData {
   driverId?: string | null;
   driverName?: string;
   driverPhoneNumber?: string;
-  passengers?: RidePassenger[];
+  passengers?: RidePassenger[]; // Ensure RidePassenger is used here
   currentLatitude?: number;
   currentLongitude?: number;
   progress?: number;
