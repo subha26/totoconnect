@@ -10,6 +10,7 @@ export interface User {
   pin: string; 
   role: UserRole;
   profileImageVersion?: number; // Added for changing profile picture
+  phoneNumberLastUpdatedAt?: Timestamp | null; // Added for phone number update tracking
 }
 
 export type RideStatus =

@@ -10,8 +10,9 @@ import {
   onAuthStateChanged,
   signOut as firebaseSignOut,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { TEST_PASSENGER_PHONE, TEST_PASSENGER_PIN, TEST_PASSENGER_NAME, TEST_DRIVER_PHONE, TEST_DRIVER_PIN, TEST_DRIVER_NAME } from '@/lib/constants';
+import { isSameDay } from 'date-fns';
 
 
 interface AuthContextType {
@@ -21,7 +22,8 @@ interface AuthContextType {
   logout: () => void;
   signup: (phoneNumber: string, name: string, pin: string, role: UserRole) => Promise<boolean>;
   changeProfilePicture: () => Promise<void>;
-  updateUserRole: (newRole: UserRole) => Promise<boolean>; // Added for role update
+  updateUserRole: (newRole: UserRole) => Promise<boolean>;
+  updatePhoneNumber: (newPhoneNumber: string) => Promise<{ success: boolean; message: string }>;
   firebaseUser: import('firebase/auth').User | null; 
 }
 
@@ -38,29 +40,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user); 
       if (user) {
-        const userDocRef = doc(db, "users", user.uid);
+        const userDocRef = doc(db, "users", user.uid); // Assuming UID is used if Firebase Auth is primary
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const appUser = userDocSnap.data() as User;
           setCurrentUser(appUser);
           localStorage.setItem('totoConnectUser', JSON.stringify(appUser));
         } else {
-          // This case might happen if user exists in Firebase Auth but not Firestore
-          // Attempt to load from localStorage, or clear if inconsistent
+          // Fallback for mock auth or if user doc is identified by phone number
           const storedUser = localStorage.getItem('totoConnectUser');
           if (storedUser) {
             const parsedStoredUser: User = JSON.parse(storedUser);
-            // A basic check to see if the localStorage user matches the Firebase Auth user
-            // This example assumes phone number is unique ID in Firestore for non-Firebase Auth users.
-            // For Firebase Auth users, uid is the key.
-            // If using phone number as ID for mock users:
-            // if (user.phoneNumber && parsedStoredUser.id === user.phoneNumber) {
-            //   setCurrentUser(parsedStoredUser);
-            // } else 
-            if (parsedStoredUser.id === user.uid) { // Assuming user.id in Firestore matches Firebase Auth uid
+             // For Firebase Auth, ID should match UID. For mock, it might be phone.
+            if (parsedStoredUser.id === user.uid || parsedStoredUser.id === user.phoneNumber) {
                  setCurrentUser(parsedStoredUser);
             } else {
-              setCurrentUser(null);
+              // If Firebase Auth user and localStorage user ID don't match, prioritize Firebase Auth user
+              // This block might need adjustment if a full Firebase Auth (non-mock) user is created without a Firestore doc yet
+              setCurrentUser(null); 
               localStorage.removeItem('totoConnectUser');
             }
           } else {
@@ -69,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       } else {
+        // No Firebase Auth user
         try {
           const storedUser = localStorage.getItem('totoConnectUser');
           if (storedUser) {
@@ -91,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (phoneNumber: string, pin: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // Using phoneNumber as document ID for mock login
       const userDocRef = doc(db, "users", phoneNumber);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -136,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     try {
-      // Using phoneNumber as document ID for mock signup
       const userDocRef = doc(db, "users", phoneNumber); 
       const userDocSnap = await getDoc(userDocRef);
 
@@ -147,12 +143,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const newUser: User = {
-        id: phoneNumber, // Using phone number as ID for mock system
+        id: phoneNumber, 
         phoneNumber,
         name,
         pin, 
         role,
         profileImageVersion: 0,
+        phoneNumberLastUpdatedAt: null,
       };
       
       await setDoc(userDocRef, newUser); 
@@ -212,25 +209,99 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
   };
+
+  const updatePhoneNumber = async (newPhoneNumber: string): Promise<{ success: boolean; message: string }> => {
+    if (!currentUser) return { success: false, message: "User not logged in." };
+    if (newPhoneNumber.length !== 10 || !/^\d{10}$/.test(newPhoneNumber)) {
+      return { success: false, message: "Invalid phone number format. Must be 10 digits." };
+    }
+    if (newPhoneNumber === currentUser.phoneNumber) {
+        return { success: false, message: "New phone number is the same as the current one." };
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Check rate limit
+      if (currentUser.phoneNumberLastUpdatedAt) {
+        const lastUpdateDate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+        if (isSameDay(lastUpdateDate, new Date())) {
+          setIsLoading(false);
+          return { success: false, message: "Phone number can only be updated once per day." };
+        }
+      }
+
+      // Check if new phone number already exists for another user
+      const newPhoneUserDocRef = doc(db, "users", newPhoneNumber);
+      const newPhoneUserDocSnap = await getDoc(newPhoneUserDocRef);
+      if (newPhoneUserDocSnap.exists()) {
+        setIsLoading(false);
+        return { success: false, message: "This phone number is already registered to another account." };
+      }
+
+      // Get current user data
+      const oldUserDocRef = doc(db, "users", currentUser.id);
+      const oldUserDocSnap = await getDoc(oldUserDocRef);
+      if (!oldUserDocSnap.exists()) {
+        setIsLoading(false);
+        return { success: false, message: "Current user data not found." };
+      }
+      const oldUserData = oldUserDocSnap.data() as User;
+
+      // Prepare new user data
+      const updatedUserData: User = {
+        ...oldUserData,
+        id: newPhoneNumber, // New document ID will be the new phone number
+        phoneNumber: newPhoneNumber,
+        phoneNumberLastUpdatedAt: serverTimestamp() as Timestamp, // This will be resolved by Firestore
+      };
+      
+      // Create new document and delete old one (simulating ID change)
+      await setDoc(newPhoneUserDocRef, updatedUserData);
+      await deleteDoc(oldUserDocRef);
+
+      // Update local state and localStorage
+      // For immediate UI update, we can create a temporary User object with a JS Date for phoneNumberLastUpdatedAt
+      const displayUserData: User = {
+        ...updatedUserData,
+        // Firestore serverTimestamp is not immediately available client-side.
+        // For UI, we can use a client-side timestamp or refetch.
+        // Here, we'll set it to a JS Date object for local state.
+        // The actual value in Firestore will be a server timestamp.
+        phoneNumberLastUpdatedAt: Timestamp.now(), 
+      };
+      setCurrentUser(displayUserData);
+      localStorage.setItem('totoConnectUser', JSON.stringify(displayUserData));
+      
+      setIsLoading(false);
+      return { success: true, message: "Phone number updated successfully." };
+
+    } catch (error) {
+      console.error("Error updating phone number:", error);
+      setIsLoading(false);
+      return { success: false, message: "An error occurred while updating phone number." };
+    }
+  };
   
   useEffect(() => {
     const seedMockUser = async (mockUser: User) => {
       const userRef = doc(db, "users", mockUser.phoneNumber); 
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
-        await setDoc(userRef, { ...mockUser, id: mockUser.phoneNumber, profileImageVersion: 0 }); 
+        // Add phoneNumberLastUpdatedAt: null during seeding
+        await setDoc(userRef, { ...mockUser, id: mockUser.phoneNumber, profileImageVersion: 0, phoneNumberLastUpdatedAt: null }); 
         console.log(`Mock user ${mockUser.name} added to Firestore with ID ${mockUser.phoneNumber}.`);
       }
     };
     
-    const passengerMockForDb: User = { id: TEST_PASSENGER_PHONE, phoneNumber: TEST_PASSENGER_PHONE, name: TEST_PASSENGER_NAME, pin: TEST_PASSENGER_PIN, role: 'passenger', profileImageVersion: 0 };
-    const driverMockForDb: User = { id: TEST_DRIVER_PHONE, phoneNumber: TEST_DRIVER_PHONE, name: TEST_DRIVER_NAME, pin: TEST_DRIVER_PIN, role: 'driver', profileImageVersion: 0 };
+    const passengerMockForDb: User = { id: TEST_PASSENGER_PHONE, phoneNumber: TEST_PASSENGER_PHONE, name: TEST_PASSENGER_NAME, pin: TEST_PASSENGER_PIN, role: 'passenger', profileImageVersion: 0, phoneNumberLastUpdatedAt: null };
+    const driverMockForDb: User = { id: TEST_DRIVER_PHONE, phoneNumber: TEST_DRIVER_PHONE, name: TEST_DRIVER_NAME, pin: TEST_DRIVER_PIN, role: 'driver', profileImageVersion: 0, phoneNumberLastUpdatedAt: null };
     
-    const seedMockUsers = async () => {
-      await seedMockUser(passengerMockForDb);
-      await seedMockUser(driverMockForDb);
-    };
-    // seedMockUsers(); // Commented out to prevent re-seeding on every load, enable if needed for initial setup
+    // const seedMockUsers = async () => {
+    //   await seedMockUser(passengerMockForDb);
+    //   await seedMockUser(driverMockForDb);
+    // };
+    // seedMockUsers(); // Commented out to prevent re-seeding. Enable for initial setup.
   }, []);
 
 
@@ -242,7 +313,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       logout, 
       signup,
       changeProfilePicture,
-      updateUserRole, // Expose new function
+      updateUserRole,
+      updatePhoneNumber,
       firebaseUser
     }}>
       {children}
@@ -257,3 +329,7 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// For RideFirestoreData in ride-context.tsx, it typically won't need phoneNumberLastUpdatedAt
+// unless rides directly query/store that piece of user info, which is unlikely.
+// The User type is the source of truth for user properties.

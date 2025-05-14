@@ -1,22 +1,43 @@
 
 "use client";
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Phone, Briefcase, LogOut, Camera } from 'lucide-react';
+import { User, Phone, Briefcase, LogOut, Camera, Edit3, Save, XCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-// Removed Label import as it's no longer directly used for Role in the new structure
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { UserRole } from '@/lib/types';
+import { Input } from '@/components/ui/input';
+import { format, isSameDay } from 'date-fns';
+import type { Timestamp } from 'firebase/firestore';
 
 export default function ProfilePage() {
-  const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole } = useAuth();
+  const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole, updatePhoneNumber } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+
+  const [isEditingPhoneNumber, setIsEditingPhoneNumber] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [phoneEditError, setPhoneEditError] = useState<string | null>(null);
+  const [canUpdatePhoneNumberToday, setCanUpdatePhoneNumberToday] = useState(true);
+
+  useEffect(() => {
+    if (currentUser?.phoneNumber) {
+      setNewPhoneNumber(currentUser.phoneNumber);
+    }
+    if (currentUser?.phoneNumberLastUpdatedAt) {
+      const lastUpdate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+      setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
+    } else {
+      setCanUpdatePhoneNumberToday(true);
+    }
+  }, [currentUser]);
+
 
   if (isLoading || !currentUser) {
     return (
@@ -61,6 +82,47 @@ export default function ProfilePage() {
     }
   };
 
+  const handleEditPhoneNumber = () => {
+    setIsEditingPhoneNumber(true);
+    setNewPhoneNumber(currentUser.phoneNumber);
+    setPhoneEditError(null);
+  };
+
+  const handleCancelEditPhoneNumber = () => {
+    setIsEditingPhoneNumber(false);
+    setPhoneEditError(null);
+  };
+
+  const handleSavePhoneNumber = async () => {
+    setPhoneEditError(null);
+    if (newPhoneNumber.length !== 10 || !/^\d{10}$/.test(newPhoneNumber)) {
+      setPhoneEditError("Phone number must be 10 digits.");
+      return;
+    }
+    if (newPhoneNumber === currentUser.phoneNumber) {
+      setIsEditingPhoneNumber(false);
+      return;
+    }
+
+    const result = await updatePhoneNumber(newPhoneNumber);
+    toast({
+      title: result.success ? "Success" : "Error",
+      description: result.message,
+      variant: result.success ? "default" : "destructive",
+    });
+    if (result.success) {
+      setIsEditingPhoneNumber(false);
+       if (currentUser?.phoneNumberLastUpdatedAt) { // Re-check after successful update
+         const lastUpdate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+         setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
+       } else {
+         setCanUpdatePhoneNumberToday(false); // Should be false immediately after an update
+       }
+    } else {
+      setPhoneEditError(result.message);
+    }
+  };
+
   const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
 
   return (
@@ -90,12 +152,50 @@ export default function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
-          <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
-            <Phone className="h-6 w-6 text-primary" />
-            <div>
-                <p className="text-xs text-muted-foreground">Phone Number</p>
-                <p className="font-semibold text-foreground">{currentUser.phoneNumber}</p>
+          <div className="p-3 bg-secondary/50 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <Phone className="h-6 w-6 text-primary" />
+              <div className="flex-grow">
+                  <p className="text-xs text-muted-foreground">Phone Number</p>
+                  {!isEditingPhoneNumber ? (
+                    <p className="font-semibold text-foreground">{currentUser.phoneNumber}</p>
+                  ) : (
+                    <Input
+                      type="tel"
+                      value={newPhoneNumber}
+                      onChange={(e) => setNewPhoneNumber(e.target.value)}
+                      maxLength={10}
+                      className="font-semibold text-foreground h-auto p-0 border-none bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
+                    />
+                  )}
+              </div>
+              {!isEditingPhoneNumber && canUpdatePhoneNumberToday && (
+                <Button variant="ghost" size="icon" onClick={handleEditPhoneNumber} title="Edit phone number">
+                  <Edit3 className="h-4 w-4 text-primary" />
+                </Button>
+              )}
             </div>
+            {isEditingPhoneNumber && (
+              <div className="mt-2 flex space-x-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={handleCancelEditPhoneNumber}>
+                  <XCircle className="mr-1 h-4 w-4" /> Cancel
+                </Button>
+                <Button size="sm" onClick={handleSavePhoneNumber} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  <Save className="mr-1 h-4 w-4" /> Save
+                </Button>
+              </div>
+            )}
+            {phoneEditError && <p className="text-xs text-destructive mt-1">{phoneEditError}</p>}
+            {!canUpdatePhoneNumberToday && !isEditingPhoneNumber && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Phone number updated today. You can update it again tomorrow.
+              </p>
+            )}
+             {currentUser.phoneNumberLastUpdatedAt && !isEditingPhoneNumber && (
+                 <p className="text-xs text-muted-foreground mt-1">
+                    Last updated: {format((currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate(), "PPp")}
+                 </p>
+             )}
           </div>
           
           <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
