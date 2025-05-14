@@ -11,7 +11,7 @@ import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Bell, Car, Users, MessageSquare, Phone, Edit, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// ScrollArea import removed as it's no longer used for these sections directly
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
 import {
@@ -104,21 +104,25 @@ export default function DriverHomePage() {
   // In a real app, this would come from GPS updates
   const activeRide = currentDriverRide;
   
-  if (activeRide && activeRide.status === 'On Route') {
-      // This interval setup might be problematic with React's lifecycle and Next.js.
-      // Consider moving progress updates to be triggered by real events or a more robust polling mechanism if needed.
-      const intervalId = setInterval(() => {
-        if (activeRide.progress === undefined || activeRide.progress >= 100) {
-            clearInterval(intervalId);
-            if(activeRide.progress >=100 && activeRide.status !== 'Completed') {
-              updateRideStatus(activeRide.id, 'Destination Reached', 100);
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (activeRide && activeRide.status === 'On Route') {
+        intervalId = setInterval(() => {
+            if (activeRide.progress === undefined || activeRide.progress >= 100) {
+                if (intervalId) clearInterval(intervalId);
+                if(activeRide.progress >=100 && activeRide.status !== 'Completed') {
+                updateRideStatus(activeRide.id, 'Destination Reached', 100);
+                }
+                return;
             }
-            return;
-        }
-        const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
-        updateRideStatus(activeRide.id, 'On Route', newProgress);
-      }, 5000); // Update every 5 seconds
-  }
+            const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
+            updateRideStatus(activeRide.id, 'On Route', newProgress);
+        }, 5000); // Update every 5 seconds
+    }
+    return () => {
+        if (intervalId) clearInterval(intervalId);
+    };
+  }, [activeRide, updateRideStatus]);
 
 
   if (ridesLoading || !currentUser) {
@@ -127,9 +131,9 @@ export default function DriverHomePage() {
         <Skeleton className="h-10 w-48" />
         {currentDriverRide && <Skeleton className="h-72 w-full rounded-xl" />}
         <Skeleton className="h-8 w-32" />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-56 w-full rounded-xl" />
-          <Skeleton className="h-56 w-full rounded-xl" />
+        <div className="flex space-x-4 overflow-hidden pb-4">
+          <Skeleton className="h-56 w-80 flex-none rounded-xl" />
+          <Skeleton className="h-56 w-80 flex-none rounded-xl" />
         </div>
       </div>
     );
@@ -139,7 +143,6 @@ export default function DriverHomePage() {
     <div className="container mx-auto p-4 space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-primary">Driver Dashboard</h1>
-         {/* Emergency button removed */}
       </header>
 
       {activeRide && (
@@ -149,7 +152,7 @@ export default function DriverHomePage() {
             ride={activeRide}
             userRole="driver"
             onCompleteRide={handleCompleteRide}
-            onCancelReservation={async (id) => { // Driver cancelling the whole ride
+            onCancelReservation={async (id) => { 
                 await updateRideStatus(id, "Cancelled");
                 toast({title: "Ride Cancelled", variant: "destructive"});
             }}
@@ -167,8 +170,7 @@ export default function DriverHomePage() {
           </Button>
         </div>
         {driverUpcomingRides.length > 0 ? (
-           <ScrollArea className="h-[calc(100vh-var(--current-ride-height,0px)-var(--header-height,0px)-var(--nav-height,0px)-350px)]">
-            <div className="grid gap-4 md:grid-cols-2">
+           <div className="flex overflow-x-auto space-x-4 pb-4 pt-1">
               {driverUpcomingRides.map((ride) => (
                 <RideCard 
                   key={ride.id} 
@@ -179,10 +181,10 @@ export default function DriverHomePage() {
                   onOpenChat={handleOpenChatModal}
                   onEditRide={handleEditRide}
                   onDeleteRide={handleDeleteRide}
+                  className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
                 />
               ))}
             </div>
-          </ScrollArea>
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
@@ -201,19 +203,18 @@ export default function DriverHomePage() {
             </Button>
         </div>
          {driverRideRequests.length > 0 ? (
-            <ScrollArea className="h-[200px)]"> {/* Fixed height for this section or adjust as needed */}
-                <div className="grid gap-4 md:grid-cols-2">
-                {driverRideRequests.slice(0,2).map((ride) => ( // Show first 2 requests
+            <div className="flex overflow-x-auto space-x-4 pb-4 pt-1">
+                {driverRideRequests.map((ride) => ( 
                     <RideCard 
                     key={ride.id} 
                     ride={ride} 
                     userRole="driver" 
                     onAcceptRequest={handleAcceptRequest}
                     onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                    className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
                     />
                 ))}
-                </div>
-           </ScrollArea>
+            </div>
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
@@ -253,3 +254,4 @@ export default function DriverHomePage() {
     </div>
   );
 }
+
