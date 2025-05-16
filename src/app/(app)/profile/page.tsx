@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -18,6 +17,7 @@ import { format, isSameDay } from 'date-fns';
 import type { Timestamp } from 'firebase/firestore';
 import { SECURITY_QUESTIONS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function ProfilePage() {
   const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole, updatePhoneNumber, changePin, updateSecurityQA } = useAuth();
@@ -138,7 +138,7 @@ export default function ProfilePage() {
          const lastUpdate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
          setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
        } else {
-         setCanUpdatePhoneNumberToday(false);
+         setCanUpdatePhoneNumberToday(false); 
        }
     } else {
       setPhoneEditError(result.message);
@@ -194,7 +194,6 @@ export default function ProfilePage() {
     if (result.success) {
       setCurrentSecurityQuestion(newSecurityQuestion);
       setPinForSecurityUpdate('');
-      // Keep newSecurityQuestion as is, clear answer for security
       setNewSecurityAnswer('');
     }
     setIsUpdatingSecurity(false);
@@ -278,7 +277,7 @@ export default function ProfilePage() {
           </div>
           
           {/* Role Section */}
-          <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
+           <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
             <Briefcase className="h-6 w-6 text-primary" />
             <div className="w-full">
                 <p className="text-xs text-muted-foreground">Role</p>
@@ -302,73 +301,80 @@ export default function ProfilePage() {
           
           <Separator />
 
-          {/* Change PIN Section */}
-          <Card className="shadow-md rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center"><KeyRound className="mr-2 h-5 w-5 text-primary"/>Change PIN</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleChangePinSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="oldPin">Old PIN</Label>
-                  <Input id="oldPin" type="password" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
+          <Accordion type="multiple" className="w-full space-y-4">
+            {/* Change PIN Section */}
+            <AccordionItem value="change-pin">
+              <AccordionTrigger className="text-lg font-semibold hover:no-underline p-3 bg-secondary/50 rounded-lg">
+                <div className="flex items-center">
+                  <KeyRound className="mr-2 h-5 w-5 text-primary"/>Change PIN
                 </div>
-                <div>
-                  <Label htmlFor="newPin">New PIN</Label>
-                  <Input id="newPin" type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
-                </div>
-                <div>
-                  <Label htmlFor="confirmNewPin">Confirm New PIN</Label>
-                  <Input id="confirmNewPin" type="password" value={confirmNewPin} onChange={(e) => setConfirmNewPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
-                </div>
-                <Button type="submit" className="w-full" disabled={isChangingPin}>
-                  {isChangingPin ? 'Changing PIN...' : 'Change PIN'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 px-3">
+                <form onSubmit={handleChangePinSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="oldPin">Old PIN</Label>
+                    <Input id="oldPin" type="password" value={oldPin} onChange={(e) => setOldPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
+                  </div>
+                  <div>
+                    <Label htmlFor="newPin">New PIN</Label>
+                    <Input id="newPin" type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmNewPin">Confirm New PIN</Label>
+                    <Input id="confirmNewPin" type="password" value={confirmNewPin} onChange={(e) => setConfirmNewPin(e.target.value)} maxLength={4} required className="tracking-widest"/>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isChangingPin}>
+                    {isChangingPin ? 'Changing PIN...' : 'Change PIN'}
+                  </Button>
+                </form>
+              </AccordionContent>
+            </AccordionItem>
 
-          <Separator />
-
-          {/* Security Question/Answer Section */}
-          <Card className="shadow-md rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center"><ShieldQuestion className="mr-2 h-5 w-5 text-primary"/>Security Question & Answer</CardTitle>
-              <CardDescription>
-                Current Question: <span className="font-medium">{currentSecurityQuestion}</span>
-                {currentUser.securityAnswer && <span className="text-xs block text-muted-foreground">(Answer is hidden for security)</span>}
-                 {!currentUser.securityQuestion && <span className="text-xs block text-destructive">Security question not set. Please set one.</span>}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdateSecurityQASubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="newSecurityQuestion">New Security Question</Label>
-                  <Select value={newSecurityQuestion} onValueChange={setNewSecurityQuestion}>
-                    <SelectTrigger id="newSecurityQuestion">
-                      <SelectValue placeholder="Select a new question" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SECURITY_QUESTIONS.map((q, index) => (
-                        <SelectItem key={index} value={q}>{q}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {/* Security Question/Answer Section */}
+            <AccordionItem value="security-qa">
+              <AccordionTrigger className="text-lg font-semibold hover:no-underline p-3 bg-secondary/50 rounded-lg">
+                <div className="flex flex-col items-start text-left w-full">
+                    <div className="flex items-center">
+                        <ShieldQuestion className="mr-2 h-5 w-5 text-primary"/>
+                        <span>Security Question &amp; Answer</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground font-normal mt-1 text-left">
+                        Current Question: <span className="font-medium">{currentSecurityQuestion}</span>
+                        {currentUser.securityAnswer && <span className="text-xs block text-muted-foreground">(Answer is hidden for security)</span>}
+                        {!currentUser.securityQuestion && <span className="text-xs block text-destructive">Security question not set. Please set one.</span>}
+                    </div>
                 </div>
-                <div>
-                  <Label htmlFor="newSecurityAnswer">New Security Answer</Label>
-                  <Input id="newSecurityAnswer" type="text" value={newSecurityAnswer} onChange={(e) => setNewSecurityAnswer(e.target.value)} placeholder="Your new answer" required />
-                </div>
-                <div>
-                  <Label htmlFor="pinForSecurityUpdate">Current PIN (to confirm changes)</Label>
-                  <Input id="pinForSecurityUpdate" type="password" value={pinForSecurityUpdate} onChange={(e) => setPinForSecurityUpdate(e.target.value)} maxLength={4} required className="tracking-widest"/>
-                </div>
-                <Button type="submit" className="w-full" disabled={isUpdatingSecurity}>
-                  {isUpdatingSecurity ? 'Updating...' : (currentUser.securityQuestion ? 'Update Security Info' : 'Set Security Info')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 px-3">
+                <form onSubmit={handleUpdateSecurityQASubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="newSecurityQuestion">New Security Question</Label>
+                    <Select value={newSecurityQuestion} onValueChange={setNewSecurityQuestion}>
+                      <SelectTrigger id="newSecurityQuestion">
+                        <SelectValue placeholder="Select a new question" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SECURITY_QUESTIONS.map((q, index) => (
+                          <SelectItem key={index} value={q}>{q}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="newSecurityAnswer">New Security Answer</Label>
+                    <Input id="newSecurityAnswer" type="text" value={newSecurityAnswer} onChange={(e) => setNewSecurityAnswer(e.target.value)} placeholder="Your new answer" required />
+                  </div>
+                  <div>
+                    <Label htmlFor="pinForSecurityUpdate">Current PIN (to confirm changes)</Label>
+                    <Input id="pinForSecurityUpdate" type="password" value={pinForSecurityUpdate} onChange={(e) => setPinForSecurityUpdate(e.target.value)} maxLength={4} required className="tracking-widest"/>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isUpdatingSecurity}>
+                    {isUpdatingSecurity ? 'Updating...' : (currentUser.securityQuestion ? 'Update Security Info' : 'Set Security Info')}
+                  </Button>
+                </form>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           <Separator />
           
@@ -380,3 +386,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
