@@ -38,6 +38,7 @@ interface RideContextType {
   getRideById: (rideId: string) => Ride | undefined;
   updateRideDetails: (rideId: string, details: Partial<RideFirestoreData>) => Promise<boolean>;
   deleteRide: (rideId: string) => Promise<boolean>;
+  deleteRideRequest: (rideId: string) => Promise<boolean>; // New function
   passengerUpcomingRides: Ride[];
   passengerPastRides: Ride[];
   driverUpcomingRides: Ride[];
@@ -73,14 +74,11 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
           departureTime: (data.departureTime as Timestamp).toDate().toISOString(),
         } as Ride;
 
-        // Rule 3c: Filter out expired 'Requested' rides (client-side representation)
-        // Or, if backend could update them to 'Expired', that would be better.
-        if (ride.status === 'Requested' && new Date(ride.departureTime) < new Date()) {
-          // Consider this ride 'Expired' for display purposes or further actions.
-          // Optionally, update its status in DB if it makes sense for your flow.
-          // For now, we just filter or handle it in derived state.
-          // This ride might be "deleted" from user view by not including it in lists like driverRideRequests below.
-          // Actual deletion might be better as a backend task.
+        if (ride.status === 'Requested' && new Date(ride.departureTime) < new Date() && ride.status !== 'Expired') {
+          // Mark as expired on client side if not already, or consider updating in DB.
+          // This helps ensure it's filtered correctly in derived states.
+          // It's better if a backend job handles actual status updates to 'Expired'.
+          // For now, we filter based on time for 'Requested' rides in derived lists.
         } else {
           fetchedRides.push(ride);
         }
@@ -88,21 +86,19 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
 
       // Notification logic
       if (currentUser && prevRidesRef.current.length > 0) {
-        // Driver: New ride request
         const oldDriverRequests = prevRidesRef.current.filter(r => r.status === 'Requested' && new Date(r.departureTime) >= new Date());
         const newDriverRequests = fetchedRides.filter(r => r.status === 'Requested' && new Date(r.departureTime) >= new Date());
         if (newDriverRequests.length > oldDriverRequests.length) {
            const newReq = newDriverRequests.find(nr => !oldDriverRequests.some(or => or.id === nr.id));
-           if(newReq && newReq.driverId !== currentUser.id) { // Don't notify driver if they requested it somehow (not typical)
+           if(newReq && newReq.driverId !== currentUser.id && currentUser.role === 'driver') { 
              toast({ title: "New Ride Request", description: `A new ride from ${newReq.origin} to ${newReq.destination} has been requested.` });
            }
         }
 
-        // Passenger: Ride request accepted
         const passengerOldRequests = prevRidesRef.current.filter(r => r.requestedBy === currentUser.id && r.status === 'Requested');
         passengerOldRequests.forEach(oldReq => {
           const correspondingNewRide = fetchedRides.find(newRide => newRide.id === oldReq.id);
-          if (correspondingNewRide && correspondingNewRide.status === 'Scheduled' && oldReq.status === 'Requested') {
+          if (correspondingNewRide && correspondingNewRide.status === 'Scheduled' && oldReq.status === 'Requested' && currentUser.role === 'passenger') {
             toast({ title: "Ride Request Accepted!", description: `Your ride from ${correspondingNewRide.origin} to ${correspondingNewRide.destination} is now scheduled.` });
           }
         });
@@ -118,13 +114,12 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [currentUser, toast]); // Added toast to dependencies
+  }, [currentUser, toast]); 
 
 
   const requestRide = async (departureTime: Date, origin: string, destination: string, requestType: RideRequestType): Promise<{success: boolean; rideId: string | null; message?: string}> => {
     if (!currentUser || currentUser.role !== 'passenger') return {success: false, rideId: null, message: "User must be a passenger."};
     
-    // Rule 3b: Passenger can post a maximum of 2 active ride requests
     const passengerActiveRideRequests = rides.filter(
       ride => ride.requestedBy === currentUser.id && ride.status === 'Requested' && new Date(ride.departureTime) >= new Date()
     );
@@ -132,7 +127,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       return {success: false, rideId: null, message: "You can only have a maximum of 2 active ride requests."};
     }
 
-    // Rule 3a: is handled on client page, but double check here
     if (departureTime < new Date()) {
         return {success: false, rideId: null, message: "Departure time cannot be in the past."};
     }
@@ -146,9 +140,9 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       if (requestType === 'full_reserved') {
         rideTotalSeats = 1;
         rideMaxPassengers = 1;
-        rideSeatsAvailable = 1;
-      } else { // 'sharing'
-        rideTotalSeats = 4; // As per requirement for sharing
+        rideSeatsAvailable = 1; 
+      } else { 
+        rideTotalSeats = 4; 
         rideMaxPassengers = 4;
         rideSeatsAvailable = 4;
       }
@@ -215,8 +209,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         return false; 
       }
       
-      // For sharing, maxPassengers is either totalSeats or a specific value like 4.
-      // Assuming totalSeats already reflects the intended capacity (e.g., 4 for sharing).
       if (rideData.passengers.length >= rideData.totalSeats) {
          toast({ title: "Ride Full", description: "This ride has reached its maximum passenger capacity.", variant: "destructive"});
          setIsLoading(false);
@@ -255,7 +247,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
          setIsLoading(false);
          return false; 
       }
-      // Passengers can only cancel if ride is 'Scheduled' or 'About to Depart'
       if (rideData.status !== 'Scheduled' && rideData.status !== 'About to Depart') {
         toast({ title: "Cancellation Not Allowed", description: "You can only cancel scheduled or about to depart rides.", variant: "destructive"});
         setIsLoading(false);
@@ -312,8 +303,8 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         driverPhoneNumber: currentUser.phoneNumber,
         passengers: [],
         progress: 0,
-        requestType: 'sharing', // Driver posted rides are by default sharing
-        maxPassengers: totalSeats, // For driver posted rides, max passengers is total seats
+        requestType: 'sharing', 
+        maxPassengers: totalSeats, 
       };
       const docRef = await addDoc(collection(db, RIDES_COLLECTION), newRideData);
       setIsLoading(false);
@@ -364,7 +355,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       }
       if (new Date(rideData.departureTime) < new Date()) {
         toast({ title: "Expired Request", description: "This ride request has expired.", variant: "destructive" });
-        // Optionally update status to 'Expired'
         await updateDoc(rideRef, { status: 'Expired' });
         setIsLoading(false);
         return false;
@@ -385,16 +375,15 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       
       const passengerToAdd: RidePassenger = { userId: requesterUserData.id, name: requesterUserData.name, phoneNumber: requesterUserData.phoneNumber };
       
-      // Determine total seats based on request type
-      let finalTotalSeats = rideData.totalSeats; // Default to what was set during request
+      let finalTotalSeats = rideData.totalSeats;
       let finalSeatsAvailable = rideData.seatsAvailable;
 
       if (rideData.requestType === 'full_reserved') {
         finalTotalSeats = 1;
-        finalSeatsAvailable = 0; // Only the requester
-      } else { // 'sharing'
-        finalTotalSeats = rideData.maxPassengers || 4; // Default to 4 for sharing or what was set
-        finalSeatsAvailable = finalTotalSeats - 1; // One seat for the requester
+        finalSeatsAvailable = 0; 
+      } else { 
+        finalTotalSeats = rideData.maxPassengers || 4; 
+        finalSeatsAvailable = finalTotalSeats - 1; 
       }
 
 
@@ -405,7 +394,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         driverPhoneNumber: currentUser.phoneNumber,
         passengers: arrayUnion(passengerToAdd),
         seatsAvailable: finalSeatsAvailable,
-        totalSeats: finalTotalSeats, // Ensure totalSeats matches the accepted type
+        totalSeats: finalTotalSeats, 
         maxPassengers: rideData.requestType === 'full_reserved' ? 1 : (rideData.maxPassengers || 4),
       });
       setIsLoading(false);
@@ -445,6 +434,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
+        toast({ title: "Error", description: "Ride not found or you're not authorized.", variant: "destructive" });
         setIsLoading(false);
         return false; 
       }
@@ -454,15 +444,49 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
       await deleteDoc(rideRef);
+      toast({ title: "Ride Deleted", description: "The ride offer has been removed." });
       setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error deleting ride: ", error);
+      toast({ title: "Deletion Failed", description: "Could not delete the ride.", variant: "destructive" });
       setIsLoading(false);
       return false;
     }
   };
   
+  const deleteRideRequest = async (rideId: string): Promise<boolean> => {
+    if (!currentUser || currentUser.role !== 'passenger') {
+      toast({ title: "Unauthorized", description: "Only passengers can delete their requests.", variant: "destructive" });
+      return false;
+    }
+    setIsLoading(true);
+    const rideRef = doc(db, RIDES_COLLECTION, rideId);
+    try {
+      const rideSnap = await getDoc(rideRef);
+      if (!rideSnap.exists()) {
+        toast({ title: "Request Not Found", variant: "destructive" });
+        setIsLoading(false);
+        return false;
+      }
+      const rideData = rideSnap.data() as Ride;
+      if (rideData.requestedBy !== currentUser.id || rideData.status !== 'Requested') {
+        toast({ title: "Cannot Delete", description: "This request cannot be deleted or does not belong to you.", variant: "destructive" });
+        setIsLoading(false);
+        return false;
+      }
+      await deleteDoc(rideRef);
+      toast({ title: "Request Deleted", description: "Your ride request has been successfully deleted." });
+      setIsLoading(false);
+      return true;
+    } catch (error) {
+      console.error("Error deleting ride request:", error);
+      toast({ title: "Deletion Failed", description: "Could not delete the ride request.", variant: "destructive" });
+      setIsLoading(false);
+      return false;
+    }
+  };
+
   const getRideById = (rideId: string): Ride | undefined => {
     return rides.find(ride => ride.id === rideId);
   };
@@ -472,12 +496,12 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   const passengerUpcomingRides = rides.filter(ride => 
     currentUser && ride.passengers.some(p => p.userId === currentUser.id) && 
     new Date(ride.departureTime) >= now && 
-    ride.status !== 'Completed' && ride.status !== 'Cancelled' && ride.status !== 'Expired'
+    ride.status !== 'Completed' && ride.status !== 'Cancelled' && ride.status !== 'Expired' && ride.status !== 'Requested'
   ).sort((a,b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
 
   const passengerPastRides = rides.filter(ride => 
     currentUser && ride.passengers.some(p => p.userId === currentUser.id) && 
-    (new Date(ride.departureTime) < now || ride.status === 'Completed' || ride.status === 'Cancelled' || ride.status === 'Expired')
+    (new Date(ride.departureTime) < now || ['Completed', 'Cancelled', 'Expired'].includes(ride.status))
   ).sort((a,b) => new Date(b.departureTime).getTime() - new Date(a.departureTime).getTime());
   
   const passengerActiveRequests = rides.filter(ride => 
@@ -493,14 +517,13 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   
   const driverPastRides = rides.filter(ride =>
     currentUser && ride.driverId === currentUser.id && 
-    (new Date(ride.departureTime) < now || ride.status === 'Completed' || ride.status === 'Cancelled' || ride.status === 'Expired') &&
-    ride.status !== 'Requested'
+    ((new Date(ride.departureTime) < now && ride.status !== 'Requested') || ['Completed', 'Cancelled', 'Expired'].includes(ride.status))
   ).sort((a,b) => new Date(b.departureTime).getTime() - new Date(a.departureTime).getTime());
 
   const driverRideRequests = rides.filter(ride => 
     ride.status === 'Requested' && 
     currentUser?.role === 'driver' && 
-    new Date(ride.departureTime) >= now // Rule 3c: Don't show expired requests to driver
+    new Date(ride.departureTime) >= now 
   ).sort((a,b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
 
 
@@ -518,7 +541,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   return (
     <RideContext.Provider value={{ 
         rides, isLoading, requestRide, reserveSeat, cancelReservation, postRide, updateRideStatus, acceptRideRequest, getRideById,
-        updateRideDetails, deleteRide,
+        updateRideDetails, deleteRide, deleteRideRequest,
         passengerUpcomingRides, passengerPastRides, driverUpcomingRides, driverPastRides, driverRideRequests,
         currentPassengerRide, currentDriverRide,
         passengerActiveRequests
@@ -535,3 +558,4 @@ export const useRides = (): RideContextType => {
   }
   return context;
 };
+

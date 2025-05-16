@@ -4,8 +4,7 @@
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label'; // Keep if used elsewhere, but not directly for icons
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck } from 'lucide-react';
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -25,6 +24,7 @@ interface RideCardProps {
   onOpenChat?: (rideId: string, chatTitle: string) => void;
   onEditRide?: (rideId: string) => void;
   onDeleteRide?: (rideId: string) => void;
+  onDeleteRequest?: (rideId: string) => void; // New prop
   isCurrentRide?: boolean;
   className?: string;
 }
@@ -60,6 +60,7 @@ export function RideCard({
   onOpenChat,
   onEditRide,
   onDeleteRide,
+  onDeleteRequest, // New prop
   isCurrentRide = false,
   className,
 }: RideCardProps) {
@@ -139,7 +140,6 @@ export function RideCard({
       }
     }
     
-    // For available rides (not requested by current user)
     if (status === 'Scheduled' && onReserve && requestType !== 'full_reserved' && seatsAvailable > 0 && !isRideRequestedByCurrentUser) {
       return (
         <Button onClick={() => onReserve(id)} size="sm" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
@@ -153,13 +153,22 @@ export function RideCard({
     if (status === 'Scheduled' && requestType === 'full_reserved' && !isRideRequestedByCurrentUser) {
         return <p className="text-sm text-muted-foreground text-center flex items-center justify-center"><Lock className="w-3 h-3 mr-1"/> Private Ride</p>;
     }
+
+    // New: Delete Request Button for passenger
+    if (status === 'Requested' && isPassenger && isRideRequestedByCurrentUser && onDeleteRequest) {
+      return (
+        <Button onClick={() => onDeleteRequest(id)} size="sm" variant="destructive" className="w-full">
+          <Trash2 className="mr-2 h-4 w-4" /> Delete Request
+        </Button>
+      );
+    }
     return null; 
   };
 
   const renderDriverActions = () => {
     if (!currentUser) return null;
 
-    if (status === 'Requested' && onAcceptRequest && isDriver && ride.driverId !== currentUser.id) {
+    if (status === 'Requested' && onAcceptRequest && isDriver && ride.driverId !== currentUser.id) { // Driver should not accept their own requests
       return (
         <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
           <CheckCircle className="mr-2 h-4 w-4" /> Accept Request
@@ -190,7 +199,7 @@ export function RideCard({
                 )}
               </div>
             )}
-            {isCurrentRide && onCancelReservation && ( // Driver cancelling their *own* current scheduled ride
+            {isCurrentRide && onCancelReservation && ( 
                  <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full mt-2">
                     <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
                 </Button>
@@ -297,7 +306,7 @@ export function RideCard({
         {onViewDetails && (
             (!isCurrentRide && status !== 'Expired') ||
             (isCurrentRide && isPassenger && !passengerIsOnThisRide && status === 'Scheduled' && seatsAvailable > 0) ||
-            (status === 'Requested' && currentUser && (ride.requestedBy === currentUser.id || userRole === 'driver'))
+            (status === 'Requested' && currentUser && (isRideRequestedByCurrentUser || userRole === 'driver'))
         ) && (
           <Button onClick={() => onViewDetails(id)} variant="link" size="sm" className="w-full text-primary mt-2">
             View Details
@@ -310,3 +319,4 @@ export function RideCard({
     </Card>
   );
 }
+

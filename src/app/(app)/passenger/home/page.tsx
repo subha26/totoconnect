@@ -9,13 +9,23 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare, ListChecks } from 'lucide-react';
+import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare, ListChecks, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-// ScrollArea import removed for Available Rides, kept for potential future use or other sections
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Ride } from '@/lib/types';
 import { ChatModal } from '@/components/chat-modal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 export default function PassengerHomePage() {
   const router = useRouter();
@@ -26,13 +36,16 @@ export default function PassengerHomePage() {
     reserveSeat, 
     cancelReservation,
     currentPassengerRide,
-    passengerActiveRequests // Get active requests for the passenger
+    passengerActiveRequests,
+    deleteRideRequest // New function from context
   } = useRides();
   const { toast } = useToast();
 
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chatRideId, setChatRideId] = useState<string | null>(null);
   const [chatModalTitle, setChatModalTitle] = useState("");
+  const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
+
 
   const handleOpenChatModal = (rideId: string, title: string) => {
     setChatRideId(rideId);
@@ -44,9 +57,7 @@ export default function PassengerHomePage() {
     const success = await reserveSeat(rideId);
     if (success) {
       toast({ title: "Seat Reserved!", description: "Your spot is confirmed." });
-    } else {
-      // Toast for failure is handled within reserveSeat context function
-    }
+    } 
   };
 
   const handleCancelReservation = async (rideId: string) => {
@@ -62,6 +73,18 @@ export default function PassengerHomePage() {
     toast({ title: "Ride Confirmed", description: "You have confirmed you are on board." });
   };
 
+  const handleDeleteRequest = (rideId: string) => {
+    setRequestToDelete(rideId);
+  };
+
+  const confirmDeleteRequest = async () => {
+    if (requestToDelete) {
+      const success = await deleteRideRequest(requestToDelete);
+      // Toast is handled in context
+      setRequestToDelete(null);
+    }
+  };
+
   const availableRides = useMemo(() => {
     if (!currentUser) return [];
     const now = new Date();
@@ -70,7 +93,8 @@ export default function PassengerHomePage() {
       new Date(ride.departureTime) >= now &&
       ride.seatsAvailable > 0 &&
       !ride.passengers.find(p => p.userId === currentUser.id) &&
-      ride.driverId !== currentUser.id
+      ride.driverId !== currentUser.id &&
+      ride.requestType !== 'full_reserved' // Don't show fully reserved rides to others
     );
 
     const uniqueRideOfferKeys = new Set<string>();
@@ -89,10 +113,10 @@ export default function PassengerHomePage() {
     return (
       <div className="container mx-auto p-4 space-y-6">
         <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-72 w-full rounded-xl mb-4" /> {/* For current ride */}
-        <Skeleton className="h-8 w-40 mb-2" /> {/* For "My Active Ride Requests" title */}
-        <Skeleton className="h-48 w-full rounded-xl mb-4" /> {/* For active requests card */}
-        <Skeleton className="h-8 w-32 mb-2" /> {/* For "Available Rides" title */}
+        <Skeleton className="h-72 w-full rounded-xl mb-4" /> 
+        <Skeleton className="h-8 w-40 mb-2" /> 
+        <Skeleton className="h-48 w-full rounded-xl mb-4" /> 
+        <Skeleton className="h-8 w-32 mb-2" /> 
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-56 w-full rounded-xl" />
           <Skeleton className="h-56 w-full rounded-xl" />
@@ -121,13 +145,11 @@ export default function PassengerHomePage() {
         </section>
       )}
 
-      {/* Section for My Active Ride Requests */}
       <section>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-xl font-semibold text-foreground flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary"/>My Active Ride Requests</h2>
         </div>
         {passengerActiveRequests.length > 0 ? (
-            // Using ScrollArea for horizontal scrolling if many requests
             <ScrollArea className="w-full whitespace-nowrap pb-4">
                 <div className="flex space-x-4">
                     {passengerActiveRequests.map((ride: Ride) => (
@@ -135,9 +157,8 @@ export default function PassengerHomePage() {
                         key={ride.id} 
                         ride={ride} 
                         userRole="passenger"
-                        // Passenger cannot cancel a 'Requested' ride directly from here; they'd go to details or a manage requests page.
-                        // Or, if cancellation of a 'Requested' ride is allowed, add onCancelRequest prop.
                         onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                        onDeleteRequest={handleDeleteRequest} // Pass delete handler
                         className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
                     />
                     ))}
@@ -162,7 +183,6 @@ export default function PassengerHomePage() {
           </Button>
         </div>
         {availableRides.length > 0 ? (
-            // Removed ScrollArea, using natural grid flow
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {availableRides.map((ride: Ride) => (
                 <RideCard 
@@ -193,6 +213,25 @@ export default function PassengerHomePage() {
           currentUser={currentUser}
         />
       )}
+      {requestToDelete && (
+        <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Ride Request?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this ride request? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setRequestToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteRequest} className="bg-destructive hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+
