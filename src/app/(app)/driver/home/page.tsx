@@ -30,7 +30,7 @@ export default function DriverHomePage() {
   const { currentUser } = useAuth();
   const { 
     driverUpcomingRides, 
-    driverRideRequests, // This list will now be filtered in context to exclude expired
+    driverRideRequests, 
     isLoading: ridesLoading, 
     updateRideStatus,
     acceptRideRequest,
@@ -101,27 +101,27 @@ export default function DriverHomePage() {
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
-    if (activeRide && activeRide.status === 'On Route') {
+    if (currentDriverRide && currentDriverRide.status === 'On Route') {
         intervalId = setInterval(() => {
-            if (activeRide.progress === undefined || activeRide.progress >= 100) {
+            if (currentDriverRide.progress === undefined || currentDriverRide.progress >= 100) {
                 if (intervalId) clearInterval(intervalId);
-                if(activeRide.progress >=100 && activeRide.status !== 'Completed') {
+                if(currentDriverRide.progress >=100 && currentDriverRide.status !== 'Completed') {
                 if (typeof updateRideStatus === 'function') {
-                    updateRideStatus(activeRide.id, 'Destination Reached', 100);
+                    updateRideStatus(currentDriverRide.id, 'Destination Reached', 100);
                 }
                 }
                 return;
             }
-            const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
+            const newProgress = Math.min((currentDriverRide.progress || 0) + 10, 100);
             if (typeof updateRideStatus === 'function') {
-                updateRideStatus(activeRide.id, 'On Route', newProgress);
+                updateRideStatus(currentDriverRide.id, 'On Route', newProgress);
             }
         }, 5000);
     }
     return () => {
         if (intervalId) clearInterval(intervalId);
     };
-  }, [activeRide, updateRideStatus]);
+  }, [currentDriverRide, updateRideStatus]);
 
 
   if (ridesLoading || !currentUser) {
@@ -150,11 +150,11 @@ export default function DriverHomePage() {
         <h1 className="text-2xl font-semibold text-primary">Driver Dashboard</h1>
       </header>
 
-      {activeRide && (
+      {currentDriverRide && (
         <section>
           <h2 className="text-xl font-semibold mb-3 text-foreground">Current Ride</h2>
            <RideCard
-            ride={activeRide}
+            ride={currentDriverRide}
             userRole="driver"
             onCompleteRide={handleCompleteRide}
             onCancelReservation={async (id) => { // Driver cancelling their own active ride
