@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -11,22 +12,19 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   role?: 'passenger' | 'driver';
+  isCentralButton?: boolean; // Flag for special styling
 }
-
-// Common nav items are removed as Emergency and Profile are no longer in bottom nav
-const commonNavItems: NavItem[] = [];
 
 const passengerNavItems: NavItem[] = [
   { href: '/passenger/home', label: 'Home', icon: Home, role: 'passenger' },
+  { href: '/passenger/request-ride', label: 'Request', icon: PlusCircle, role: 'passenger', isCentralButton: true },
   { href: '/passenger/rides', label: 'My Rides', icon: ListCollapse, role: 'passenger' },
-  // ...commonNavItems, // No longer spreading commonNavItems
 ];
 
 const driverNavItems: NavItem[] = [
   { href: '/driver/home', label: 'Home', icon: Car, role: 'driver' },
   { href: '/driver/requests', label: 'Requests', icon: Bell, role: 'driver' },
   { href: '/driver/post-ride', label: 'Post Ride', icon: PlusCircle, role: 'driver' },
-  // ...commonNavItems, // No longer spreading commonNavItems
 ];
 
 
@@ -35,7 +33,7 @@ export function BottomNav() {
   const { currentUser } = useAuth();
 
   if (!currentUser) {
-    return null; // Don't show nav if not logged in (e.g. on login/signup pages)
+    return null; 
   }
   
   const navItems = currentUser.role === 'driver' ? driverNavItems : passengerNavItems;
@@ -48,18 +46,22 @@ export function BottomNav() {
             key={item.label}
             href={item.href}
             className={cn(
-              'flex flex-col items-center justify-center p-2 rounded-md transition-colors w-1/3 text-center', // Ensure items spread out
-              pathname === item.href
+              'flex flex-col items-center justify-center rounded-md transition-colors text-center flex-1 group', // Added group for potential hover effects on children
+              // Active styling: only apply primary text color if NOT the central button and path matches
+              pathname === item.href && !item.isCentralButton
                 ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+              // Special styling for the central button
+              item.isCentralButton 
+                ? 'bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl p-2 -translate-y-3 shadow-lg h-16 w-16 flex items-center justify-center' // Adjusted for better visual as central button
+                : 'p-2 h-full' // Regular padding for other items
             )}
             aria-current={pathname === item.href ? 'page' : undefined}
           >
-            <item.icon className="w-6 h-6" />
-            <span className="text-xs mt-1">{item.label}</span>
+            <item.icon className={cn("w-6 h-6", item.isCentralButton ? "text-accent-foreground" : "")} />
+            <span className={cn("text-xs mt-1", item.isCentralButton ? "text-accent-foreground font-medium" : "")}>{item.label}</span>
           </Link>
         ))}
-        {/* Logout button removed */}
       </div>
     </nav>
   );

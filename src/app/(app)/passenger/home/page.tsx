@@ -9,7 +9,7 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare, ListChecks, Trash2 } from 'lucide-react';
+import { UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare, ListChecks, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -178,7 +178,6 @@ export default function PassengerHomePage() {
       <section>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-xl font-semibold text-foreground">Available Rides</h2>
-          {/* Button removed from here */}
         </div>
         {availableRides.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -203,14 +202,7 @@ export default function PassengerHomePage() {
         )}
       </section>
 
-      <div className="mt-8"> {/* Added div for the button at the bottom */}
-        <Button 
-          onClick={() => router.push('/passenger/request-ride')} 
-          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-3 text-lg"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" /> Request Ride
-        </Button>
-      </div>
+      {/* Request Ride button removed from here */}
 
       {currentUser && chatRideId && (
         <ChatModal
