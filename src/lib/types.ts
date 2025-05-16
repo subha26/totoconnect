@@ -4,13 +4,15 @@ import type { Timestamp } from 'firebase/firestore';
 export type UserRole = 'passenger' | 'driver' | null;
 
 export interface User {
-  id: string; 
+  id: string;
   phoneNumber: string;
   name: string;
-  pin: string; 
+  pin: string;
   role: UserRole;
-  profileImageVersion?: number; // Added for changing profile picture
-  phoneNumberLastUpdatedAt?: Timestamp | null; // Added for phone number update tracking
+  profileImageVersion?: number;
+  phoneNumberLastUpdatedAt?: Timestamp | null;
+  securityQuestion?: string; // Added
+  securityAnswer?: string;   // Added
 }
 
 export type RideStatus =
@@ -23,7 +25,7 @@ export type RideStatus =
   | 'At Source'
   | 'Waiting'
   | 'Destination Reached'
-  | 'Requested'; 
+  | 'Requested';
 
 export interface RidePassenger {
   userId: string;
@@ -32,10 +34,10 @@ export interface RidePassenger {
 }
 
 export interface Ride {
-  id: string; 
+  id: string;
   origin: string;
   destination: string;
-  departureTime: string; 
+  departureTime: string;
   seatsAvailable: number;
   totalSeats: number;
   status: RideStatus;
@@ -45,8 +47,8 @@ export interface Ride {
   passengers: RidePassenger[];
   currentLatitude?: number;
   currentLongitude?: number;
-  progress?: number; 
-  requestedBy?: string; 
+  progress?: number;
+  requestedBy?: string;
 }
 
 export interface RideFirestoreData {
@@ -68,10 +70,9 @@ export interface RideFirestoreData {
 
 
 export interface ChatMessage {
-  id: string; 
+  id: string;
   senderId: string;
   senderName: string;
   text: string;
-  timestamp: Timestamp; 
+  timestamp: Timestamp;
 }
-

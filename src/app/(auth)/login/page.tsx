@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -74,10 +75,15 @@ export default function LoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pin" className="flex items-center">
-              <KeyRound className="mr-2 h-5 w-5 text-primary" />
-              4-Digit PIN
-            </Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="pin" className="flex items-center">
+                <KeyRound className="mr-2 h-5 w-5 text-primary" />
+                4-Digit PIN
+              </Label>
+              <Link href="/forgot-pin" className="text-sm text-primary hover:underline">
+                Forgot PIN?
+              </Link>
+            </div>
             <Input
               id="pin"
               type="password"

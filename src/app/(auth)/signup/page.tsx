@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -8,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole } from '@/lib/types';
-import { Phone, UserCircle2, KeyRound, Users, UserPlus } from 'lucide-react';
-import { APP_NAME } from '@/lib/constants';
+import { Phone, UserCircle2, KeyRound, Users, UserPlus, ShieldQuestion, MessageCircle } from 'lucide-react';
+import { APP_NAME, SECURITY_QUESTIONS } from '@/lib/constants';
 
 export default function SignupPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -20,6 +22,8 @@ export default function SignupPage() {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [role, setRole] = useState<UserRole>(null);
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const { signup, isLoading: authIsLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -47,9 +51,17 @@ export default function SignupPage() {
       toast({ title: "Select Role", description: "Please select if you are a Passenger or Driver.", variant: "destructive" });
       return;
     }
+    if (!securityQuestion) {
+      toast({ title: "Select Security Question", description: "Please select a security question.", variant: "destructive" });
+      return;
+    }
+    if (!securityAnswer.trim()) {
+      toast({ title: "Provide Security Answer", description: "Please provide an answer to your security question.", variant: "destructive" });
+      return;
+    }
 
     setIsSubmitting(true);
-    const success = await signup(phoneNumber, name, pin, role);
+    const success = await signup(phoneNumber, name, pin, role, securityQuestion, securityAnswer.trim());
 
     if (success) {
       toast({ title: "Signup Successful!", description: `Welcome, ${name}!` });
@@ -157,6 +169,39 @@ export default function SignupPage() {
                 <Label htmlFor="role-driver" className="text-lg">Driver</Label>
               </div>
             </RadioGroup>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="securityQuestion" className="flex items-center">
+              <ShieldQuestion className="mr-2 h-5 w-5 text-primary" />
+              Security Question
+            </Label>
+            <Select value={securityQuestion} onValueChange={setSecurityQuestion}>
+              <SelectTrigger id="securityQuestion" className="text-lg">
+                <SelectValue placeholder="Select a question" />
+              </SelectTrigger>
+              <SelectContent>
+                {SECURITY_QUESTIONS.map((q, index) => (
+                  <SelectItem key={index} value={q}>{q}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="securityAnswer" className="flex items-center">
+              <MessageCircle className="mr-2 h-5 w-5 text-primary" />
+              Security Answer
+            </Label>
+            <Input
+              id="securityAnswer"
+              type="text"
+              value={securityAnswer}
+              onChange={(e) => setSecurityAnswer(e.target.value)}
+              placeholder="Your answer"
+              required
+              className="text-lg"
+            />
           </div>
           
           <Button type="submit" className="w-full text-lg py-3" disabled={isLoading}>

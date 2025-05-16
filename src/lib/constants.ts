@@ -1,3 +1,4 @@
+
 export const APP_NAME = "TotoConnect";
 
 export const LOCATIONS = {
@@ -19,3 +20,14 @@ export const TEST_DRIVER_PIN = "4321";
 export const TEST_DRIVER_NAME = "Test Driver";
 
 export const DEFAULT_TOTAL_SEATS = 3; // Standard Toto capacity
+
+export const SECURITY_QUESTIONS = [
+  "What was your childhood nickname?",
+  "In what city did you meet your spouse/significant other?",
+  "What is the name of your favorite childhood friend?",
+  "What street did you live on in third grade?",
+  "What is your oldest sibling’s middle name?",
+  "What school did you attend for sixth grade?",
+  "What was the name of your first pet?",
+  "What was the make and model of your first car?",
+];
