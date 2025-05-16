@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react'; // Import React, useState, useMemo
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,12 +9,13 @@ import { RideCard } from '@/components/ride-card';
 import { useAuth } from '@/contexts/auth-context';
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare } from 'lucide-react';
+import { PlusCircle, UserCircle2, Car, MapPin, Clock, Users, Phone, MessageSquare, ListChecks } from 'lucide-react';
 import Image from 'next/image';
+// ScrollArea import removed for Available Rides, kept for potential future use or other sections
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Ride } from '@/lib/types'; // Import Ride type
-import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
+import type { Ride } from '@/lib/types';
+import { ChatModal } from '@/components/chat-modal';
 
 export default function PassengerHomePage() {
   const router = useRouter();
@@ -24,8 +25,8 @@ export default function PassengerHomePage() {
     isLoading: ridesLoading, 
     reserveSeat, 
     cancelReservation,
-    updateRideStatus, // Not typically used by passenger to change core status
-    currentPassengerRide 
+    currentPassengerRide,
+    passengerActiveRequests // Get active requests for the passenger
   } = useRides();
   const { toast } = useToast();
 
@@ -44,7 +45,7 @@ export default function PassengerHomePage() {
     if (success) {
       toast({ title: "Seat Reserved!", description: "Your spot is confirmed." });
     } else {
-      toast({ title: "Reservation Failed", description: "Could not reserve seat. It might be full or already reserved.", variant: "destructive" });
+      // Toast for failure is handled within reserveSeat context function
     }
   };
 
@@ -59,38 +60,28 @@ export default function PassengerHomePage() {
   
   const handleConfirmBoarded = async (rideId: string) => {
     toast({ title: "Ride Confirmed", description: "You have confirmed you are on board." });
-    // In a more complex system, this might update a passenger's specific status within the ride document
-    // For example: ride.passengers[index].boarded = true
   };
 
-  // Filter and de-duplicate available rides
   const availableRides = useMemo(() => {
     if (!currentUser) return [];
-
-    // 1. Basic filtering criteria
+    const now = new Date();
     const potentiallyAvailable = allRides.filter(ride => 
       ride.status === 'Scheduled' &&
-      ride.status !== 'Cancelled' &&
+      new Date(ride.departureTime) >= now &&
       ride.seatsAvailable > 0 &&
       !ride.passengers.find(p => p.userId === currentUser.id) &&
       ride.driverId !== currentUser.id
     );
 
-    // 2. De-duplicate the potentially available rides
     const uniqueRideOfferKeys = new Set<string>();
-    const deDuplicatedRides = potentiallyAvailable.filter(ride => {
-      // Key for uniqueness: driver, origin, destination, and full departure time.
+    return potentiallyAvailable.filter(ride => {
       const rideKey = `${ride.driverId}-${ride.origin}-${ride.destination}-${ride.departureTime}`;
       if (!uniqueRideOfferKeys.has(rideKey)) {
         uniqueRideOfferKeys.add(rideKey);
         return true;
       }
       return false;
-    });
-    
-    // 3. Sort by departure time (soonest first)
-    return deDuplicatedRides.sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
-
+    }).sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
   }, [allRides, currentUser]);
 
 
@@ -98,8 +89,10 @@ export default function PassengerHomePage() {
     return (
       <div className="container mx-auto p-4 space-y-6">
         <Skeleton className="h-10 w-48" />
-        {/* No need to check currentPassengerRide here as it depends on currentUser */}
-        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-72 w-full rounded-xl mb-4" /> {/* For current ride */}
+        <Skeleton className="h-8 w-40 mb-2" /> {/* For "My Active Ride Requests" title */}
+        <Skeleton className="h-48 w-full rounded-xl mb-4" /> {/* For active requests card */}
+        <Skeleton className="h-8 w-32 mb-2" /> {/* For "Available Rides" title */}
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-56 w-full rounded-xl" />
           <Skeleton className="h-56 w-full rounded-xl" />
@@ -112,7 +105,6 @@ export default function PassengerHomePage() {
     <div className="container mx-auto p-4 space-y-6">
       <header className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-primary">Welcome, {currentUser.name}!</h1>
-        {/* Emergency button removed */}
       </header>
 
       {currentPassengerRide && (
@@ -121,13 +113,46 @@ export default function PassengerHomePage() {
           <RideCard 
             ride={currentPassengerRide} 
             userRole="passenger"
-            onCancelReservation={handleCancelReservation} // Passenger can cancel their seat on current ride if not started
+            onCancelReservation={handleCancelReservation}
             onConfirmBoarded={handleConfirmBoarded}
             onOpenChat={handleOpenChatModal}
             isCurrentRide={true}
           />
         </section>
       )}
+
+      {/* Section for My Active Ride Requests */}
+      <section>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-xl font-semibold text-foreground flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary"/>My Active Ride Requests</h2>
+        </div>
+        {passengerActiveRequests.length > 0 ? (
+            // Using ScrollArea for horizontal scrolling if many requests
+            <ScrollArea className="w-full whitespace-nowrap pb-4">
+                <div className="flex space-x-4">
+                    {passengerActiveRequests.map((ride: Ride) => (
+                    <RideCard 
+                        key={ride.id} 
+                        ride={ride} 
+                        userRole="passenger"
+                        // Passenger cannot cancel a 'Requested' ride directly from here; they'd go to details or a manage requests page.
+                        // Or, if cancellation of a 'Requested' ride is allowed, add onCancelRequest prop.
+                        onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                        className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
+                    />
+                    ))}
+                </div>
+            </ScrollArea>
+        ) : (
+          <Card className="shadow-lg rounded-xl">
+            <CardContent className="p-6 text-center">
+              <Image src="https://placehold.co/300x200.png" alt="No active requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty checklist illustration" />
+              <p className="text-muted-foreground">You have no active ride requests.</p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
 
       <section>
         <div className="flex justify-between items-center mb-3">
@@ -137,8 +162,8 @@ export default function PassengerHomePage() {
           </Button>
         </div>
         {availableRides.length > 0 ? (
-          <ScrollArea className="h-[calc(100vh-var(--current-ride-height,0px)-var(--header-height,0px)-var(--nav-height,0px)-250px)]">
-            <div className="grid gap-4 md:grid-cols-2">
+            // Removed ScrollArea, using natural grid flow
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {availableRides.map((ride: Ride) => (
                 <RideCard 
                   key={ride.id} 
@@ -150,11 +175,10 @@ export default function PassengerHomePage() {
                 />
               ))}
             </div>
-          </ScrollArea>
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-              <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty state illustration" />
+              <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty street illustration" />
               <p className="text-muted-foreground">No scheduled rides available right now. Try requesting one!</p>
             </CardContent>
           </Card>

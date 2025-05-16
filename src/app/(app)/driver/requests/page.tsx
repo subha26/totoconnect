@@ -10,7 +10,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 export default function DriverRequestsPage() {
-  const { driverRideRequests, isLoading, acceptRideRequest } = useRides();
+  const { driverRideRequests, isLoading, acceptRideRequest } = useRides(); // driverRideRequests is now filtered in context
   const { toast } = useToast();
   const router = useRouter();
 
@@ -19,7 +19,7 @@ export default function DriverRequestsPage() {
     if (success) {
       toast({ title: "Ride Request Accepted!", description: "The ride is now scheduled and moved to your upcoming rides." });
     } else {
-      toast({ title: "Failed to Accept Request", description: "Please try again or the request may no longer be valid.", variant: "destructive" });
+      // Failure toast handled in context
     }
   };
 
@@ -36,7 +36,7 @@ export default function DriverRequestsPage() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-semibold mb-6 text-primary">Passenger Ride Requests</h1>
-      <ScrollArea className="h-[calc(100vh-150px)]"> {/* Adjust height dynamically */}
+      <ScrollArea className="h-[calc(100vh-150px)]">
         {driverRideRequests.length > 0 ? (
           <div className="space-y-4">
             {driverRideRequests.map((ride) => (
@@ -45,13 +45,13 @@ export default function DriverRequestsPage() {
                 ride={ride} 
                 userRole="driver" 
                 onAcceptRequest={handleAcceptRequest}
-                onViewDetails={() => router.push(`/ride/${ride.id}`)} // Allow viewing details before accepting
+                onViewDetails={() => router.push(`/ride/${ride.id}`)}
               />
             ))}
           </div>
         ) : (
           <div className="text-center py-10">
-            <Image src="https://placehold.co/300x200.png" alt="No pending requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty bell illustration" />
+            <Image src="https://placehold.co/300x200.png" alt="No pending requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty alert bell" />
             <p className="text-muted-foreground">No pending ride requests at this time.</p>
           </div>
         )}

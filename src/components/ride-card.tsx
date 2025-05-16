@@ -4,8 +4,8 @@
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2 } from 'lucide-react';
+import { Label } from '@/components/ui/label'; // Keep if used elsewhere, but not directly for icons
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -23,8 +23,8 @@ interface RideCardProps {
   onAcceptRequest?: (rideId: string) => void;
   onConfirmBoarded?: (rideId: string) => void;
   onOpenChat?: (rideId: string, chatTitle: string) => void;
-  onEditRide?: (rideId: string) => void; // New prop for editing ride
-  onDeleteRide?: (rideId: string) => void; // New prop for deleting ride
+  onEditRide?: (rideId: string) => void;
+  onDeleteRide?: (rideId: string) => void;
   isCurrentRide?: boolean;
   className?: string;
 }
@@ -41,6 +41,7 @@ const RideStatusIcon = ({ status }: { status: Ride['status'] }) => {
     case 'At Source': return <MapPin className="w-4 h-4 text-teal-500" />;
     case 'Waiting': return <Hourglass className="w-4 h-4 text-amber-500" />;
     case 'Destination Reached': return <Flag className="w-4 h-4 text-emerald-600" />;
+    case 'Expired': return <XCircle className="w-4 h-4 text-slate-500" />;
     default: return <CircleDot className="w-4 h-4 text-gray-500" />;
   }
 };
@@ -64,12 +65,13 @@ export function RideCard({
 }: RideCardProps) {
   const { currentUser } = useAuth(); 
   const { toast } = useToast();
-  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers } = ride;
+  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers, requestType } = ride;
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
   
   const passengerIsOnThisRide = isPassenger && currentUser && passengers.some(p => p.userId === currentUser.id);
+  const isRideRequestedByCurrentUser = currentUser && ride.requestedBy === currentUser.id;
 
   const handleCall = () => {
     let phoneNumberToCall = '';
@@ -108,17 +110,17 @@ export function RideCard({
 
 
   const renderPassengerActions = () => {
-    if (status === 'Requested' || status === 'Completed' || status === 'Cancelled') return null;
+    if (status === 'Completed' || status === 'Cancelled' || status === 'Expired') return null;
     
     if (isCurrentRide && passengerIsOnThisRide) {
        return (
         <>
-          {status !== 'On Route' && status !== 'Destination Reached' && status !== 'Completed' && status !== 'Cancelled' && (
+          {(status === 'On Route' || status === 'Arriving' || status === 'At Source' || status === 'Waiting') && onConfirmBoarded && (
             <Button onClick={() => onConfirmBoarded?.(id)} size="sm" variant="outline" className="w-full">
               <Check className="mr-2 h-4 w-4" /> Confirm Boarded
             </Button>
           )}
-          { (status === 'Scheduled' || status === 'About to Depart') && 
+          { (status === 'Scheduled' || status === 'About to Depart') && onCancelReservation &&
             <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="destructive" className="w-full mt-2">
                 <XCircle className="mr-2 h-4 w-4" /> Cancel Seat
             </Button>
@@ -128,7 +130,7 @@ export function RideCard({
     }
 
     if (passengerIsOnThisRide) { 
-      if (status === 'Scheduled' || status === 'About to Depart') {
+      if ((status === 'Scheduled' || status === 'About to Depart') && onCancelReservation) {
         return (
             <Button onClick={() => onCancelReservation?.(id)} size="sm" variant="outline" className="w-full">
             <XCircle className="mr-2 h-4 w-4" /> Cancel Reservation
@@ -136,16 +138,20 @@ export function RideCard({
         );
       }
     }
-
-    if (seatsAvailable > 0 && status === 'Scheduled' && onReserve) {
+    
+    // For available rides (not requested by current user)
+    if (status === 'Scheduled' && onReserve && requestType !== 'full_reserved' && seatsAvailable > 0 && !isRideRequestedByCurrentUser) {
       return (
         <Button onClick={() => onReserve(id)} size="sm" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           Reserve Spot
         </Button>
       );
     }
-    if (status === 'Scheduled' && seatsAvailable <= 0) {
-        return <p className="text-sm text-muted-foreground">Ride is full.</p>;
+    if (status === 'Scheduled' && seatsAvailable <= 0 && !isRideRequestedByCurrentUser) {
+        return <p className="text-sm text-muted-foreground text-center">Ride is full.</p>;
+    }
+    if (status === 'Scheduled' && requestType === 'full_reserved' && !isRideRequestedByCurrentUser) {
+        return <p className="text-sm text-muted-foreground text-center flex items-center justify-center"><Lock className="w-3 h-3 mr-1"/> Private Ride</p>;
     }
     return null; 
   };
@@ -153,7 +159,6 @@ export function RideCard({
   const renderDriverActions = () => {
     if (!currentUser) return null;
 
-    // Actions for a ride request that ANY driver can accept
     if (status === 'Requested' && onAcceptRequest && isDriver && ride.driverId !== currentUser.id) {
       return (
         <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
@@ -162,7 +167,6 @@ export function RideCard({
       );
     }
 
-    // Actions for the DRIVER WHO OWNS THE RIDE
     if (ride.driverId === currentUser.id) {
       if (status === 'Scheduled') {
         return (
@@ -172,7 +176,6 @@ export function RideCard({
                 <PlayCircle className="mr-2 h-4 w-4" /> Start Ride
               </Button>
             )}
-            {/* Edit and Delete actions specifically for 'Scheduled' state */}
             {(onEditRide || onDeleteRide) && !isCurrentRide && (
               <div className="grid grid-cols-2 gap-2">
                 {onEditRide && (
@@ -187,8 +190,7 @@ export function RideCard({
                 )}
               </div>
             )}
-             {/* Cancel entire ride for driver if it's a current (active interaction) ride card and in scheduled state */}
-            {isCurrentRide && onCancelReservation && (
+            {isCurrentRide && onCancelReservation && ( // Driver cancelling their *own* current scheduled ride
                  <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full mt-2">
                     <XCircle className="mr-2 h-4 w-4" /> Cancel Ride
                 </Button>
@@ -203,7 +205,6 @@ export function RideCard({
           </Button>
         );
       }
-       // Driver cancelling current ride (if not scheduled, e.g. about to depart, on route)
       if (isCurrentRide && (status === 'About to Depart' || status === 'On Route') && onCancelReservation) {
            return (
             <Button onClick={() => onCancelReservation(id)} size="sm" variant="destructive" className="w-full">
@@ -234,24 +235,38 @@ export function RideCard({
       </CardHeader>
       <CardContent className="p-4 space-y-3">
         
-        {isPassenger && driverName && (
+        {isPassenger && driverName && status !== 'Requested' && (
           <p className="text-sm flex items-center"><Car className="mr-2 h-4 w-4 text-muted-foreground" /> Driver: {driverName}</p>
         )}
-         {!driverName && status === 'Requested' && (
-            <p className="text-sm text-muted-foreground">Awaiting driver assignment...</p>
+        {status === 'Requested' && (
+            <div className="text-sm space-y-1">
+                 <p className="flex items-center">
+                    {requestType === 'full_reserved' ? <ShieldCheck className="mr-2 h-4 w-4 text-primary" /> : <Users className="mr-2 h-4 w-4 text-muted-foreground" />} 
+                    Type: {requestType === 'full_reserved' ? 'Full Reserved (Private)' : 'Sharing'}
+                </p>
+                {isDriver && ride.requestedBy && (
+                    <p className="flex items-center"><UserCheck className="mr-2 h-4 w-4 text-muted-foreground"/> Requested by a passenger</p>
+                )}
+                {isPassenger && isRideRequestedByCurrentUser && (
+                     <p className="text-muted-foreground">Awaiting driver assignment...</p>
+                )}
+            </div>
         )}
         
-        <div className="flex justify-between items-center text-sm">
-          <div className="flex items-center">
-            <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-            <span>
-              {status === 'Requested' ? 'Awaiting driver' : `${seatsAvailable} / ${totalSeats} seats left`}
-            </span>
-          </div>
-          {isDriver && status !== 'Requested' && currentUser && ride.driverId === currentUser.id && (
-            <p className="text-sm">Passengers: {passengers.length}</p>
-          )}
-        </div>
+        {status !== 'Requested' && (
+            <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center">
+                <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>
+                {seatsAvailable} / {totalSeats} seats left
+                </span>
+            </div>
+            {isDriver && currentUser && ride.driverId === currentUser.id && (
+                <p className="text-sm">Passengers: {passengers.length}</p>
+            )}
+            </div>
+        )}
+
 
         {isCurrentRide && (status === 'On Route' || status === 'Scheduled' || status === 'About to Depart' || status === 'Arriving' || status === 'At Source' || status === 'Waiting' || status === 'Destination Reached') && (currentUser && (passengerIsOnThisRide || (ride.driverId === currentUser.id && passengers.length > 0) )) && (
           <div className="grid grid-cols-2 gap-2 pt-2">
@@ -280,16 +295,18 @@ export function RideCard({
         {isDriver && renderDriverActions()}
         
         {onViewDetails && (
-            (!isCurrentRide) ||
+            (!isCurrentRide && status !== 'Expired') ||
             (isCurrentRide && isPassenger && !passengerIsOnThisRide && status === 'Scheduled' && seatsAvailable > 0) ||
-            (status === 'Requested' && currentUser && ride.requestedBy === currentUser.id)
+            (status === 'Requested' && currentUser && (ride.requestedBy === currentUser.id || userRole === 'driver'))
         ) && (
           <Button onClick={() => onViewDetails(id)} variant="link" size="sm" className="w-full text-primary mt-2">
             View Details
           </Button>
         )}
+         {status === 'Expired' && (
+            <p className="text-xs text-center text-muted-foreground">This ride request has expired.</p>
+        )}
       </CardFooter>
     </Card>
   );
 }
-

@@ -11,8 +11,8 @@ export interface User {
   role: UserRole;
   profileImageVersion?: number;
   phoneNumberLastUpdatedAt?: Timestamp | null;
-  securityQuestion?: string; // Added
-  securityAnswer?: string;   // Added
+  securityQuestion?: string;
+  securityAnswer?: string;
 }
 
 export type RideStatus =
@@ -25,7 +25,8 @@ export type RideStatus =
   | 'At Source'
   | 'Waiting'
   | 'Destination Reached'
-  | 'Requested';
+  | 'Requested'
+  | 'Expired'; // Added for unfulfilled past requests
 
 export interface RidePassenger {
   userId: string;
@@ -33,11 +34,13 @@ export interface RidePassenger {
   phoneNumber: string;
 }
 
+export type RideRequestType = 'sharing' | 'full_reserved';
+
 export interface Ride {
   id: string;
   origin: string;
   destination: string;
-  departureTime: string;
+  departureTime: string; // ISO String
   seatsAvailable: number;
   totalSeats: number;
   status: RideStatus;
@@ -48,7 +51,9 @@ export interface Ride {
   currentLatitude?: number;
   currentLongitude?: number;
   progress?: number;
-  requestedBy?: string;
+  requestedBy?: string; // Passenger User ID who made the request
+  requestType?: RideRequestType; // New
+  maxPassengers?: number; // New: For 'sharing' type, this could be 4. For 'full_reserved', it's 1.
 }
 
 export interface RideFirestoreData {
@@ -66,6 +71,8 @@ export interface RideFirestoreData {
   currentLongitude?: number;
   progress?: number;
   requestedBy?: string;
+  requestType?: RideRequestType; // New
+  maxPassengers?: number; // New
 }
 
 

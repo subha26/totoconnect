@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Import React, useState, and useEffect
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,8 @@ import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Bell, Car, Users, MessageSquare, Phone, Edit, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-// ScrollArea import removed as it's no longer used for these sections directly
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
+import { ChatModal } from '@/components/chat-modal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 
 
 export default function DriverHomePage() {
@@ -32,12 +30,12 @@ export default function DriverHomePage() {
   const { currentUser } = useAuth();
   const { 
     driverUpcomingRides, 
-    driverRideRequests,
+    driverRideRequests, // This list will now be filtered in context to exclude expired
     isLoading: ridesLoading, 
     updateRideStatus,
     acceptRideRequest,
     currentDriverRide,
-    deleteRide // Added deleteRide from context
+    deleteRide
   } = useRides();
   const { toast } = useToast();
 
@@ -75,7 +73,7 @@ export default function DriverHomePage() {
      if (success) {
       toast({ title: "Ride Request Accepted!", description: "The ride is now scheduled." });
     } else {
-      toast({ title: "Failed to Accept Request", description: "Please try again or the request may no longer be valid.", variant: "destructive" });
+      // Failure toast handled in context
     }
   };
 
@@ -89,21 +87,18 @@ export default function DriverHomePage() {
       if (success) {
         toast({ title: "Ride Deleted", description: "The ride has been successfully removed." });
       } else {
-        toast({ title: "Deletion Failed", description: "Could not delete the ride. Please try again.", variant: "destructive" });
+        // toast({ title: "Deletion Failed", description: "Could not delete the ride. Please try again.", variant: "destructive" });
+        // Failure toast handled in context for specific reasons (e.g., ride has passengers)
       }
-      setRideToDelete(null); // Close dialog
+      setRideToDelete(null);
     }
   };
   
   const handleDeleteRide = (rideId: string) => {
-    setRideToDelete(rideId); // Open confirmation dialog
+    setRideToDelete(rideId);
   };
 
 
-  // Simulate ride progress for current active ride
-  // In a real app, this would come from GPS updates
-  const activeRide = currentDriverRide;
-  
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (activeRide && activeRide.status === 'On Route') {
@@ -111,7 +106,6 @@ export default function DriverHomePage() {
             if (activeRide.progress === undefined || activeRide.progress >= 100) {
                 if (intervalId) clearInterval(intervalId);
                 if(activeRide.progress >=100 && activeRide.status !== 'Completed') {
-                // Check if updateRideStatus is defined before calling
                 if (typeof updateRideStatus === 'function') {
                     updateRideStatus(activeRide.id, 'Destination Reached', 100);
                 }
@@ -119,11 +113,10 @@ export default function DriverHomePage() {
                 return;
             }
             const newProgress = Math.min((activeRide.progress || 0) + 10, 100);
-            // Check if updateRideStatus is defined before calling
             if (typeof updateRideStatus === 'function') {
                 updateRideStatus(activeRide.id, 'On Route', newProgress);
             }
-        }, 5000); // Update every 5 seconds
+        }, 5000);
     }
     return () => {
         if (intervalId) clearInterval(intervalId);
@@ -135,8 +128,14 @@ export default function DriverHomePage() {
     return (
       <div className="container mx-auto p-4 space-y-6">
         <Skeleton className="h-10 w-48" />
-        {currentDriverRide && <Skeleton className="h-72 w-full rounded-xl" />}
-        <Skeleton className="h-8 w-32" />
+        {/* Skeleton for current ride if applicable */}
+        <Skeleton className="h-72 w-full rounded-xl mb-4" />
+        <Skeleton className="h-8 w-32 mb-2" />
+        <div className="flex space-x-4 overflow-hidden pb-4">
+          <Skeleton className="h-56 w-80 flex-none rounded-xl" />
+          <Skeleton className="h-56 w-80 flex-none rounded-xl" />
+        </div>
+         <Skeleton className="h-8 w-40 mb-2" />
         <div className="flex space-x-4 overflow-hidden pb-4">
           <Skeleton className="h-56 w-80 flex-none rounded-xl" />
           <Skeleton className="h-56 w-80 flex-none rounded-xl" />
@@ -158,7 +157,7 @@ export default function DriverHomePage() {
             ride={activeRide}
             userRole="driver"
             onCompleteRide={handleCompleteRide}
-            onCancelReservation={async (id) => { 
+            onCancelReservation={async (id) => { // Driver cancelling their own active ride
                 await updateRideStatus(id, "Cancelled");
                 toast({title: "Ride Cancelled", variant: "destructive"});
             }}
@@ -194,7 +193,7 @@ export default function DriverHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-               <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty road illustration" />
+               <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty road calendar" />
               <p className="text-muted-foreground">No upcoming rides scheduled. You can post one!</p>
             </CardContent>
           </Card>
@@ -224,7 +223,7 @@ export default function DriverHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-              <Image src="https://placehold.co/300x200.png" alt="No new requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty inbox illustration" />
+              <Image src="https://placehold.co/300x200.png" alt="No new requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty bell inbox" />
               <p className="text-muted-foreground">No new ride requests at the moment.</p>
             </CardContent>
           </Card>
@@ -260,4 +259,3 @@ export default function DriverHomePage() {
     </div>
   );
 }
-
