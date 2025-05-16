@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -16,7 +17,6 @@ import { Label } from '@/components/ui/label';
 import { format, isSameDay } from 'date-fns';
 import type { Timestamp } from 'firebase/firestore';
 import { SECURITY_QUESTIONS } from '@/lib/constants';
-import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function ProfilePage() {
@@ -299,8 +299,6 @@ export default function ProfilePage() {
             </div>
           </div>
           
-          <Separator />
-
           <Accordion type="multiple" className="w-full space-y-4">
             {/* Change PIN Section */}
             <AccordionItem value="change-pin">
@@ -375,8 +373,6 @@ export default function ProfilePage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-
-          <Separator />
           
           <Button onClick={logout} variant="destructive" className="w-full text-lg py-3 mt-4">
             <LogOut className="mr-2 h-5 w-5" /> Logout
@@ -386,4 +382,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
