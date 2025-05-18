@@ -145,34 +145,27 @@ export default function PassengerHomePage() {
         </section>
       )}
 
-      <section>
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-xl font-semibold text-foreground flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary"/>My Active Ride Requests</h2>
-        </div>
-        {passengerActiveRequests.length > 0 ? (
-            <ScrollArea className="w-full whitespace-nowrap pb-4">
-                <div className="flex space-x-4">
-                    {passengerActiveRequests.map((ride: Ride) => (
-                    <RideCard 
-                        key={ride.id} 
-                        ride={ride} 
-                        userRole="passenger"
-                        onViewDetails={() => router.push(`/ride/${ride.id}`)}
-                        onDeleteRequest={handleDeleteRequest} // Pass delete handler
-                        className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
-                    />
-                    ))}
-                </div>
-            </ScrollArea>
-        ) : (
-          <Card className="shadow-lg rounded-xl">
-            <CardContent className="p-6 text-center">
-              <Image src="https://placehold.co/300x200.png" alt="No active requests" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty checklist illustration" />
-              <p className="text-muted-foreground">You have no active ride requests.</p>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+      {passengerActiveRequests.length > 0 && (
+        <section>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-semibold text-foreground flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary"/>My Active Ride Requests</h2>
+          </div>
+          <ScrollArea className="w-full whitespace-nowrap pb-4">
+              <div className="flex space-x-4">
+                  {passengerActiveRequests.map((ride: Ride) => (
+                  <RideCard 
+                      key={ride.id} 
+                      ride={ride} 
+                      userRole="passenger"
+                      onViewDetails={() => router.push(`/ride/${ride.id}`)}
+                      onDeleteRequest={handleDeleteRequest} // Pass delete handler
+                      className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
+                  />
+                  ))}
+              </div>
+          </ScrollArea>
+        </section>
+      )}
 
 
       <section>
@@ -202,7 +195,7 @@ export default function PassengerHomePage() {
         )}
       </section>
 
-      {/* Request Ride button removed from here */}
+      {/* Request Ride button removed from here, moved to BottomNav */}
 
       {currentUser && chatRideId && (
         <ChatModal
