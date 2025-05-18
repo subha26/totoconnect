@@ -33,9 +33,9 @@ export function BottomNav() {
   const { currentUser } = useAuth();
 
   if (!currentUser) {
-    return null; 
+    return null;
   }
-  
+
   const navItems = currentUser.role === 'driver' ? driverNavItems : passengerNavItems;
 
   return (
@@ -46,15 +46,15 @@ export function BottomNav() {
             key={item.label}
             href={item.href}
             className={cn(
-              'flex flex-col items-center justify-center rounded-md transition-colors text-center flex-1 group', // Added group for potential hover effects on children
+              'flex flex-col items-center justify-center rounded-md transition-colors text-center flex-1 group', // Base styles for all items
               // Active styling: only apply primary text color if NOT the central button and path matches
               pathname === item.href && !item.isCentralButton
                 ? 'text-primary'
                 : 'text-muted-foreground hover:text-foreground',
-              // Special styling for the central button
-              item.isCentralButton 
-                ? 'bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl p-2 -translate-y-3 shadow-lg h-16 w-16 flex items-center justify-center' // Adjusted for better visual as central button
-                : 'p-2 h-full' // Regular padding for other items
+              // Styling for central button vs. other buttons
+              item.isCentralButton
+                ? 'bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg p-2 h-full' // New central button style
+                : 'p-2 h-full' // Regular padding and height for other items
             )}
             aria-current={pathname === item.href ? 'page' : undefined}
           >
