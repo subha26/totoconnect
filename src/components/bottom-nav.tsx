@@ -12,7 +12,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   role?: 'passenger' | 'driver';
-  isCentralButton?: boolean; // Flag for special styling
+  isCentralButton?: boolean;
 }
 
 const passengerNavItems: NavItem[] = [
@@ -23,8 +23,8 @@ const passengerNavItems: NavItem[] = [
 
 const driverNavItems: NavItem[] = [
   { href: '/driver/home', label: 'Home', icon: Car, role: 'driver' },
+  { href: '/driver/post-ride', label: 'Post', icon: PlusCircle, role: 'driver', isCentralButton: true },
   { href: '/driver/requests', label: 'Requests', icon: Bell, role: 'driver' },
-  { href: '/driver/post-ride', label: 'Post Ride', icon: PlusCircle, role: 'driver' },
 ];
 
 
@@ -41,27 +41,46 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border shadow-lg z-50">
       <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
-        {navItems.map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={cn(
-              'flex flex-col items-center justify-center rounded-md transition-colors text-center flex-1 group', // Base styles for all items
-              // Active styling: only apply primary text color if NOT the central button and path matches
-              pathname === item.href && !item.isCentralButton
-                ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground',
-              // Styling for central button vs. other buttons
-              item.isCentralButton
-                ? 'bg-accent text-accent-foreground hover:bg-accent/90 rounded-lg p-2 h-full' // New central button style
-                : 'p-2 h-full' // Regular padding and height for other items
-            )}
-            aria-current={pathname === item.href ? 'page' : undefined}
-          >
-            <item.icon className={cn("w-6 h-6", item.isCentralButton ? "text-accent-foreground" : "")} />
-            <span className={cn("text-xs mt-1", item.isCentralButton ? "text-accent-foreground font-medium" : "")}>{item.label}</span>
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          if (item.isCentralButton) {
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center justify-center rounded-full transition-all transform',
+                  // Styling for the central button:
+                  // w-16 h-16 makes it larger and circular
+                  // -mt-6 pulls it upwards, making it overlap the nav bar top edge
+                  // bg-primary and text-primary-foreground for color
+                  // shadow-xl for a pronounced raised effect
+                  'w-16 h-16 -mt-6 bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card'
+                )}
+                aria-current={pathname === item.href ? 'page' : undefined}
+              >
+                <item.icon className="w-7 h-7" /> 
+                <span className="text-xs mt-0.5">{item.label}</span>
+              </Link>
+            );
+          }
+          // Styling for other navigation items
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={cn(
+                'flex flex-col items-center justify-center rounded-md p-2 transition-colors text-center flex-1 h-full group',
+                pathname === item.href
+                  ? 'text-primary' // Active item color
+                  : 'text-muted-foreground hover:text-foreground' // Inactive item color
+              )}
+              aria-current={pathname === item.href ? 'page' : undefined}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="text-xs mt-1">{item.label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );
