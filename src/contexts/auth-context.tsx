@@ -34,6 +34,33 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const rehydrateUserTimestamps = (data: any): User => {
+  const userData = { ...data } as User;
+
+  if (userData.phoneNumberLastUpdatedAt) {
+    // Check if it's a plain object from JSON.parse, typical of serialized Timestamps
+    if (typeof userData.phoneNumberLastUpdatedAt === 'object' && 
+        userData.phoneNumberLastUpdatedAt !== null &&
+        typeof (userData.phoneNumberLastUpdatedAt as any).seconds === 'number' &&
+        typeof (userData.phoneNumberLastUpdatedAt as any).nanoseconds === 'number' &&
+        typeof (userData.phoneNumberLastUpdatedAt as any).toDate !== 'function') {
+      userData.phoneNumberLastUpdatedAt = new Timestamp(
+        (userData.phoneNumberLastUpdatedAt as any).seconds,
+        (userData.phoneNumberLastUpdatedAt as any).nanoseconds
+      );
+    } else if (!(userData.phoneNumberLastUpdatedAt instanceof Timestamp) && userData.phoneNumberLastUpdatedAt !== null) {
+      // If it's something else (e.g., already an ISO string, or invalid format) and not already a Timestamp or null
+      // For robustness, set to null if it's not a recognized format or already a Timestamp.
+      // This handles cases where it might be an improperly serialized value.
+      userData.phoneNumberLastUpdatedAt = null;
+    }
+  }
+  // Add similar rehydration for other Timestamp fields if User type evolves
+
+  return userData;
+};
+
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<import('firebase/auth').User | null>(null);
@@ -42,41 +69,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setIsLoading(true);
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
-        const userDocRef = doc(db, "users", user.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser && fbUser.phoneNumber) { // User is signed in with Firebase Auth and has a phone number
+        const userDocRef = doc(db, "users", fbUser.phoneNumber); // Use phoneNumber as Firestore doc ID
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const appUser = userDocSnap.data() as User;
+          // Data from Firestore already has proper Timestamps
           setCurrentUser(appUser);
-          localStorage.setItem('totoConnectUser', JSON.stringify(appUser));
+          localStorage.setItem('totoConnectUser', JSON.stringify(appUser)); // Store for offline/rehydration
         } else {
-          const storedUser = localStorage.getItem('totoConnectUser');
-          if (storedUser) {
-            const parsedStoredUser: User = JSON.parse(storedUser);
-            if (parsedStoredUser.id === user.uid || parsedStoredUser.id === user.phoneNumber) {
-                 setCurrentUser(parsedStoredUser);
+          // User authenticated with Firebase, but no app profile in Firestore.
+          const storedUserString = localStorage.getItem('totoConnectUser');
+          if (storedUserString) {
+            const parsedStoredUser = JSON.parse(storedUserString);
+            if (parsedStoredUser.id === fbUser.phoneNumber) {
+              setCurrentUser(rehydrateUserTimestamps(parsedStoredUser));
             } else {
+              // Mismatch, clear local and log out app state
               setCurrentUser(null);
               localStorage.removeItem('totoConnectUser');
             }
           } else {
-            setCurrentUser(null);
-            localStorage.removeItem('totoConnectUser');
+            setCurrentUser(null); // No local user, no Firestore user for this phone number
           }
         }
-      } else {
-        try {
-          const storedUser = localStorage.getItem('totoConnectUser');
-          if (storedUser) {
-            setCurrentUser(JSON.parse(storedUser));
-          } else {
-            setCurrentUser(null);
-          }
-        } catch (error) {
-          console.error("Failed to parse user from localStorage", error);
-          localStorage.removeItem('totoConnectUser');
+      } else { // No Firebase Auth user (fbUser is null) or fbUser has no phoneNumber
+        const storedUserString = localStorage.getItem('totoConnectUser');
+        if (storedUserString) {
+          setCurrentUser(rehydrateUserTimestamps(JSON.parse(storedUserString)));
+        } else {
           setCurrentUser(null);
         }
       }
@@ -97,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
-      const userData = userDocSnap.data() as User;
+      const userData = userDocSnap.data() as User; // Timestamps are correct from Firestore
       if (userData.pin === pin) {
         setCurrentUser(userData);
         localStorage.setItem('totoConnectUser', JSON.stringify(userData));
@@ -153,14 +176,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         pin,
         role,
         profileImageVersion: 0,
-        phoneNumberLastUpdatedAt: null,
+        phoneNumberLastUpdatedAt: null, // Initialize as null
         securityQuestion,
         securityAnswer,
       };
 
       await setDoc(userDocRef, newUser);
 
-      setCurrentUser(newUser);
+      setCurrentUser(newUser); // Timestamps are fine (null)
       localStorage.setItem('totoConnectUser', JSON.stringify(newUser));
 
       setIsLoading(false);
@@ -185,7 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!prevUser) return null;
         const updatedUser = { ...prevUser, profileImageVersion: newVersion };
         localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
-        return updatedUser;
+        return rehydrateUserTimestamps(updatedUser); // Rehydrate if prevUser came from localStorage
       });
     } catch (error) {
       console.error("Error changing profile picture:", error);
@@ -205,7 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!prevUser) return null;
         const updatedUser = { ...prevUser, role: newRole };
         localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
-        return updatedUser;
+        return rehydrateUserTimestamps(updatedUser);
       });
       setIsLoading(false);
       return true;
@@ -228,8 +251,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
 
     try {
-      if (currentUser.phoneNumberLastUpdatedAt) {
-        const lastUpdateDate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+      // Ensure currentUser.phoneNumberLastUpdatedAt is a Timestamp or null
+      const lastUpdateTimestamp = currentUser.phoneNumberLastUpdatedAt instanceof Timestamp 
+        ? currentUser.phoneNumberLastUpdatedAt 
+        : null;
+
+      if (lastUpdateTimestamp) {
+        const lastUpdateDate = lastUpdateTimestamp.toDate();
         if (isSameDay(lastUpdateDate, new Date())) {
           setIsLoading(false);
           return { success: false, message: "Phone number can only be updated once per day." };
@@ -251,21 +279,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const oldUserData = oldUserDocSnap.data() as User;
 
+      // Ensure oldUserData's timestamps are valid if they exist
+      const rehydratedOldUserData = rehydrateUserTimestamps(oldUserData);
+
       const updatedUserData: User = {
-        ...oldUserData,
+        ...rehydratedOldUserData,
         id: newPhoneNumber,
         phoneNumber: newPhoneNumber,
-        phoneNumberLastUpdatedAt: serverTimestamp() as Timestamp,
+        phoneNumberLastUpdatedAt: serverTimestamp() as Timestamp, // Use serverTimestamp for writing
       };
 
       await setDoc(newPhoneUserDocRef, updatedUserData);
       await deleteDoc(oldUserDocRef);
 
+      // For immediate UI update, use Timestamp.now()
       const displayUserData: User = {
         ...updatedUserData,
         phoneNumberLastUpdatedAt: Timestamp.now(),
       };
-      setCurrentUser(displayUserData);
+      setCurrentUser(displayUserData); // This has a new, correct Timestamp
       localStorage.setItem('totoConnectUser', JSON.stringify(displayUserData));
 
       setIsLoading(false);
@@ -294,10 +326,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, message: "Old PIN is incorrect." };
       }
       await updateDoc(userDocRef, { pin: newPin });
-      setCurrentUser(prev => prev ? { ...prev, pin: newPin } : null);
-      if (currentUser) {
-         localStorage.setItem('totoConnectUser', JSON.stringify({ ...currentUser, pin: newPin }));
-      }
+      setCurrentUser(prev => {
+         if (!prev) return null;
+         const updatedUser = { ...prev, pin: newPin };
+         localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
+         return rehydrateUserTimestamps(updatedUser);
+      });
       setIsLoading(false);
       return { success: true, message: "PIN changed successfully." };
     } catch (error) {
@@ -323,10 +357,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, message: "Incorrect PIN. Cannot update security question/answer." };
       }
       await updateDoc(userDocRef, { securityQuestion: question, securityAnswer: answer });
-      setCurrentUser(prev => prev ? { ...prev, securityQuestion: question, securityAnswer: answer } : null);
-       if (currentUser) {
-         localStorage.setItem('totoConnectUser', JSON.stringify({ ...currentUser, securityQuestion: question, securityAnswer: answer }));
-      }
+      setCurrentUser(prev => {
+        if(!prev) return null;
+        const updatedUser = { ...prev, securityQuestion: question, securityAnswer: answer };
+        localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
+        return rehydrateUserTimestamps(updatedUser);
+      });
       setIsLoading(false);
       return { success: true, message: "Security question and answer updated." };
     } catch (error) {
@@ -362,7 +398,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data() as User;
-        // Case-insensitive comparison for security answer
         return userData.securityAnswer?.toLowerCase() === answer.toLowerCase();
       }
       return false;
@@ -394,11 +429,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!userSnap.exists()) {
         await setDoc(userRef, {
           ...mockUser,
-          id: mockUser.phoneNumber,
+          id: mockUser.phoneNumber, // Ensure id is set to phoneNumber
           profileImageVersion: 0,
-          phoneNumberLastUpdatedAt: null,
-          securityQuestion: SECURITY_QUESTIONS[0], // Default question
-          securityAnswer: "testanswer" // Default answer for mock users
+          phoneNumberLastUpdatedAt: null, // Initialize as null
+          securityQuestion: SECURITY_QUESTIONS[0], 
+          securityAnswer: "testanswer" 
         });
         console.log(`Mock user ${mockUser.name} added to Firestore with ID ${mockUser.phoneNumber}.`);
       }
@@ -406,12 +441,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const passengerMockForDb: User = { id: TEST_PASSENGER_PHONE, phoneNumber: TEST_PASSENGER_PHONE, name: TEST_PASSENGER_NAME, pin: TEST_PASSENGER_PIN, role: 'passenger' };
     const driverMockForDb: User = { id: TEST_DRIVER_PHONE, phoneNumber: TEST_DRIVER_PHONE, name: TEST_DRIVER_NAME, pin: TEST_DRIVER_PIN, role: 'driver' };
-
+    
     // const seedMockUsers = async () => {
     //   await seedMockUser(passengerMockForDb);
     //   await seedMockUser(driverMockForDb);
     // };
-    // seedMockUsers(); // Commented out to prevent re-seeding.
+    // seedMockUsers(); 
   }, []);
 
 
@@ -444,3 +479,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

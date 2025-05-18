@@ -15,7 +15,7 @@ import type { UserRole } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, isSameDay } from 'date-fns';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore'; // Keep Timestamp for type assertion
 import { SECURITY_QUESTIONS } from '@/lib/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -47,11 +47,11 @@ export default function ProfilePage() {
   useEffect(() => {
     if (currentUser) {
       setNewPhoneNumber(currentUser.phoneNumber);
-      if (currentUser.phoneNumberLastUpdatedAt) {
-        const lastUpdate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+      if (currentUser.phoneNumberLastUpdatedAt && currentUser.phoneNumberLastUpdatedAt instanceof Timestamp) {
+        const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
         setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
       } else {
-        setCanUpdatePhoneNumberToday(true);
+        setCanUpdatePhoneNumberToday(true); // If no timestamp, assume they can update
       }
       setCurrentSecurityQuestion(currentUser.securityQuestion || "Not set");
       setNewSecurityQuestion(currentUser.securityQuestion || '');
@@ -134,10 +134,13 @@ export default function ProfilePage() {
     });
     if (result.success) {
       setIsEditingPhoneNumber(false);
-       if (currentUser?.phoneNumberLastUpdatedAt) {
-         const lastUpdate = (currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate();
+      // Re-check canUpdatePhoneNumberToday based on the potentially updated currentUser from context
+       if (currentUser?.phoneNumberLastUpdatedAt && currentUser.phoneNumberLastUpdatedAt instanceof Timestamp) {
+         const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
          setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
        } else {
+         // If it became null or non-Timestamp after update (should not happen with serverTimestamp)
+         // or if it's the first update, it will be false for today
          setCanUpdatePhoneNumberToday(false); 
        }
     } else {
@@ -192,9 +195,9 @@ export default function ProfilePage() {
       variant: result.success ? "default" : "destructive",
     });
     if (result.success) {
-      setCurrentSecurityQuestion(newSecurityQuestion);
+      setCurrentSecurityQuestion(newSecurityQuestion); // Update local state for display
       setPinForSecurityUpdate('');
-      setNewSecurityAnswer('');
+      setNewSecurityAnswer(''); // Clear input field
     }
     setIsUpdatingSecurity(false);
   };
@@ -269,9 +272,9 @@ export default function ProfilePage() {
                 Phone number updated today. You can update it again tomorrow.
               </p>
             )}
-             {currentUser.phoneNumberLastUpdatedAt && !isEditingPhoneNumber && (
+             {currentUser.phoneNumberLastUpdatedAt && currentUser.phoneNumberLastUpdatedAt instanceof Timestamp && !isEditingPhoneNumber && (
                  <p className="text-xs text-muted-foreground mt-1">
-                    Last updated: {format((currentUser.phoneNumberLastUpdatedAt as Timestamp).toDate(), "PPp")}
+                    Last updated: {format(currentUser.phoneNumberLastUpdatedAt.toDate(), "PPp")}
                  </p>
              )}
           </div>
@@ -382,3 +385,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
