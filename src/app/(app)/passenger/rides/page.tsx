@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { isSameDay } from 'date-fns';
 
 export default function PassengerRidesPage() {
   const { passengerUpcomingRides, passengerPastRides, isLoading, cancelReservation } = useRides();
@@ -24,10 +25,14 @@ export default function PassengerRidesPage() {
     }
   };
 
+  const todaysRides = passengerUpcomingRides.filter(ride => 
+    isSameDay(new Date(ride.departureTime), new Date())
+  );
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 space-y-4">
-        <Skeleton className="h-10 w-full rounded-md" />
+        <Skeleton className="h-10 w-full rounded-md mb-6" />
         <Skeleton className="h-64 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
@@ -37,16 +42,16 @@ export default function PassengerRidesPage() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-semibold mb-6 text-primary">My Rides</h1>
-      <Tabs defaultValue="upcoming" className="w-full">
+      <Tabs defaultValue="today" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+          <TabsTrigger value="today">Today's Rides</TabsTrigger>
           <TabsTrigger value="past">Past (Last Week)</TabsTrigger>
         </TabsList>
-        <TabsContent value="upcoming">
-          <ScrollArea className="h-[calc(100vh-200px)]"> {/* Adjust height dynamically */}
-            {passengerUpcomingRides.length > 0 ? (
+        <TabsContent value="today">
+          <ScrollArea className="h-[calc(100vh-200px)]">
+            {todaysRides.length > 0 ? (
               <div className="space-y-4">
-                {passengerUpcomingRides.map((ride) => (
+                {todaysRides.map((ride) => (
                   <RideCard 
                     key={ride.id} 
                     ride={ride} 
@@ -58,14 +63,14 @@ export default function PassengerRidesPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar" />
-                <p className="text-muted-foreground">You have no upcoming rides.</p>
+                <Image src="https://placehold.co/300x200.png" alt="No rides today" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar today" />
+                <p className="text-muted-foreground">You have no rides scheduled for today.</p>
               </div>
             )}
           </ScrollArea>
         </TabsContent>
         <TabsContent value="past">
-          <ScrollArea className="h-[calc(100vh-200px)]"> {/* Adjust height dynamically */}
+          <ScrollArea className="h-[calc(100vh-200px)]">
             {passengerPastRides.length > 0 ? (
               <div className="space-y-4">
                 {passengerPastRides.map((ride) => (
