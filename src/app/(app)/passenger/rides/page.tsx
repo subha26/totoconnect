@@ -58,7 +58,7 @@ export default function PassengerRidesPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar illustration" />
+                <Image src="https://placehold.co/300x200.png" alt="No upcoming rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty calendar" />
                 <p className="text-muted-foreground">You have no upcoming rides.</p>
               </div>
             )}
@@ -74,7 +74,7 @@ export default function PassengerRidesPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                 <Image src="https://placehold.co/300x200.png" alt="No past rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="archive box illustration"/>
+                 <Image src="https://placehold.co/300x200.png" alt="No past rides" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="archive box" />
                 <p className="text-muted-foreground">No ride history from the past week.</p>
               </div>
             )}
