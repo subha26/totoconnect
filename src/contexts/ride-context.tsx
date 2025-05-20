@@ -25,7 +25,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, format, getDay } from 'date-fns';
+import { addDays, format, getDay, getHours, getMinutes } from 'date-fns';
 
 interface RideContextType {
   rides: Ride[];
@@ -38,13 +38,14 @@ interface RideContextType {
     origin: string, 
     destination: string, 
     totalSeats: number,
-    selectedDays: number[] // Changed from repeatForWeek: boolean
+    selectedDays: number[] 
   ) => Promise<{success: boolean; message: string; createdRideIds: string[]}>;
   updateRideStatus: (rideId: string, status: RideStatus, progress?: number) => Promise<boolean>;
   acceptRideRequest: (rideId: string) => Promise<boolean>;
   getRideById: (rideId: string) => Ride | undefined;
   updateRideDetails: (rideId: string, details: Partial<RideFirestoreData>) => Promise<boolean>;
-  deleteRide: (rideId: string) => Promise<boolean>;
+  deleteRide: (rideId: string) => Promise<boolean>; // For single instance deletion
+  deleteFutureRecurringInstances: (baseRide: Ride) => Promise<{deletedCount: number, skippedCount: number}>;
   deleteRideRequest: (rideId: string) => Promise<boolean>;
   passengerUpcomingRides: Ride[];
   passengerPastRides: Ride[];
@@ -254,7 +255,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     origin: string, 
     destination: string, 
     totalSeats: number,
-    selectedDays: number[] // Array of day indices (0 for Sun, ..., 6 for Sat)
+    selectedDays: number[] 
   ): Promise<{success: boolean; message: string; createdRideIds: string[]}> => {
     if (!currentUser || currentUser.role !== 'driver') {
       return { success: false, message: "User must be a driver.", createdRideIds: [] };
@@ -274,19 +275,15 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     }[] = [];
 
     if (selectedDays.length === 0) {
-      // Single ride posting
       ridesToAttemptDetails.push({ departureTime: departureDateTime, origin, destination, totalSeats, wasCreatedAsRecurring: false });
     } else {
-      // Recurring rides for selected days of the week
-      selectedDays.forEach(dayIndex => { // dayIndex is 0 for Sun, 1 for Mon, ...
-        let actualOccurrenceDate = new Date(departureDateTime); // Start with the user's chosen date for day calculation
-        actualOccurrenceDate.setHours(0, 0, 0, 0); // Normalize to start of the day
+      selectedDays.forEach(dayIndex => { 
+        let actualOccurrenceDate = new Date(departureDateTime); 
+        actualOccurrenceDate.setHours(0, 0, 0, 0); 
 
-        // Advance actualOccurrenceDate to the first instance of dayIndex that is on or after departureDateTime's date part
         let daysToAdd = (dayIndex - getDay(actualOccurrenceDate) + 7) % 7;
         actualOccurrenceDate = addDays(actualOccurrenceDate, daysToAdd);
         
-        // Combine with original time from user's input
         const rideDateTime = new Date(actualOccurrenceDate);
         rideDateTime.setHours(departureDateTime.getHours(), departureDateTime.getMinutes(), 0, 0);
 
@@ -352,7 +349,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     } else if (successes === 0 && failures > 0) {
       message = `No rides posted. ${failures} ride(s) failed (all were duplicates or errors).`;
     } else if (successes === 0 && ridesToAttemptDetails.length === 0 ) {
-       message = "No rides were scheduled to be posted."; // Should not happen if logic is correct
+       message = "No rides were scheduled to be posted.";
     } else {
        message = "No rides posted or attempted.";
     }
@@ -469,7 +466,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
       await deleteDoc(rideRef);
-      // Toast is shown by component now
       return true;
     } catch (error) {
       console.error("Error deleting ride: ", error);
@@ -478,6 +474,60 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
+  const deleteFutureRecurringInstances = async (baseRide: Ride): Promise<{deletedCount: number, skippedCount: number}> => {
+    if (!currentUser || currentUser.role !== 'driver' || baseRide.driverId !== currentUser.id || !baseRide.wasCreatedAsRecurring) {
+      toast({ title: "Error", description: "Cannot delete recurring instances for this ride.", variant: "destructive" });
+      return { deletedCount: 0, skippedCount: 0 };
+    }
+
+    let deletedCount = 0;
+    let skippedCount = 0;
+
+    try {
+      const ridesRef = collection(db, RIDES_COLLECTION);
+      const baseDepartureDate = new Date(baseRide.departureTime);
+      const baseHours = getHours(baseDepartureDate);
+      const baseMinutes = getMinutes(baseDepartureDate);
+
+      const q = query(
+        ridesRef,
+        where("driverId", "==", currentUser.id),
+        where("origin", "==", baseRide.origin),
+        where("destination", "==", baseRide.destination),
+        where("wasCreatedAsRecurring", "==", true),
+        where("status", "==", 'Scheduled'),
+        where("departureTime", ">=", Timestamp.fromDate(baseDepartureDate))
+      );
+
+      const querySnapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      
+      querySnapshot.forEach((docSnap) => {
+        const rideData = { id: docSnap.id, ...docSnap.data() } as Ride;
+        const rideDepartureDate = new Date(rideData.departureTime);
+
+        // Client-side filter for time of day
+        if (getHours(rideDepartureDate) === baseHours && getMinutes(rideDepartureDate) === baseMinutes) {
+          if (rideData.passengers && rideData.passengers.length > 0) {
+            skippedCount++;
+          } else {
+            batch.delete(docSnap.ref);
+            deletedCount++;
+          }
+        }
+      });
+
+      await batch.commit();
+      return { deletedCount, skippedCount };
+
+    } catch (error) {
+      console.error("Error deleting future recurring instances: ", error);
+      toast({ title: "Deletion Error", description: "Could not delete some or all future recurring rides.", variant: "destructive" });
+      return { deletedCount, skippedCount }; // Return counts even if error occurred during batch or query
+    }
+  };
+
+
   const deleteRideRequest = async (rideId: string): Promise<boolean> => {
     if (!currentUser || currentUser.role !== 'passenger') {
       toast({ title: "Unauthorized", description: "Only passengers can delete their requests.", variant: "destructive" });
@@ -559,7 +609,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   return (
     <RideContext.Provider value={{ 
         rides, isLoading, requestRide, reserveSeat, cancelReservation, postRide, updateRideStatus, acceptRideRequest, getRideById,
-        updateRideDetails, deleteRide, deleteRideRequest,
+        updateRideDetails, deleteRide, deleteFutureRecurringInstances, deleteRideRequest,
         passengerUpcomingRides, passengerPastRides, driverUpcomingRides, driverPastRides, driverRideRequests,
         currentPassengerRide, currentDriverRide,
         passengerActiveRequests
