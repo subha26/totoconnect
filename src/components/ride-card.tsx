@@ -4,7 +4,7 @@
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck, Lock } from 'lucide-react';
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck, Lock, Repeat } from 'lucide-react'; // Added Repeat
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ interface RideCardProps {
   onOpenChat?: (rideId: string, chatTitle: string) => void;
   onEditRide?: (rideId: string) => void;
   onDeleteRide?: (rideId: string) => void;
-  onDeleteRequest?: (rideId: string) => void; // New prop
+  onDeleteRequest?: (rideId: string) => void; 
   isCurrentRide?: boolean;
   className?: string;
 }
@@ -60,13 +60,13 @@ export function RideCard({
   onOpenChat,
   onEditRide,
   onDeleteRide,
-  onDeleteRequest, // New prop
+  onDeleteRequest, 
   isCurrentRide = false,
   className,
 }: RideCardProps) {
   const { currentUser } = useAuth(); 
   const { toast } = useToast();
-  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers, requestType } = ride;
+  const { id, origin, destination, departureTime, seatsAvailable, totalSeats, status, driverName, driverPhoneNumber, passengers, requestType, wasCreatedAsRecurring } = ride;
 
   const isPassenger = userRole === 'passenger';
   const isDriver = userRole === 'driver';
@@ -154,7 +154,6 @@ export function RideCard({
         return <p className="text-sm text-muted-foreground text-center flex items-center justify-center"><Lock className="w-3 h-3 mr-1"/> Private Ride</p>;
     }
 
-    // New: Delete Request Button for passenger
     if (status === 'Requested' && isPassenger && isRideRequestedByCurrentUser && onDeleteRequest) {
       return (
         <Button onClick={() => onDeleteRequest(id)} size="sm" variant="destructive" className="w-full">
@@ -168,7 +167,7 @@ export function RideCard({
   const renderDriverActions = () => {
     if (!currentUser) return null;
 
-    if (status === 'Requested' && onAcceptRequest && isDriver && ride.driverId !== currentUser.id) { // Driver should not accept their own requests
+    if (status === 'Requested' && onAcceptRequest && isDriver && ride.driverId !== currentUser.id) { 
       return (
         <Button onClick={() => onAcceptRequest(id)} size="sm" className="w-full bg-green-500 hover:bg-green-600 text-white">
           <CheckCircle className="mr-2 h-4 w-4" /> Accept Request
@@ -228,9 +227,10 @@ export function RideCard({
   return (
     <Card className={cn("shadow-lg rounded-xl overflow-hidden", className, isCurrentRide ? "border-2 border-primary" : "")}>
       <CardHeader className="bg-primary/10 p-4">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg md:text-xl text-primary">
+        <div className="flex justify-between items-start">
+          <CardTitle className="text-lg md:text-xl text-primary flex items-center">
             {origin} to {destination}
+            {wasCreatedAsRecurring && <Repeat className="ml-2 h-4 w-4 text-primary/70" title="Recurring ride instance"/>}
           </CardTitle>
           <div className="flex items-center space-x-2 text-sm text-primary">
             <RideStatusIcon status={status} />

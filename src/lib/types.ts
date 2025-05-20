@@ -52,8 +52,9 @@ export interface Ride {
   currentLongitude?: number;
   progress?: number;
   requestedBy?: string; // Passenger User ID who made the request
-  requestType?: RideRequestType; // New
-  maxPassengers?: number; // New: For 'sharing' type, this could be 4. For 'full_reserved', it's 1.
+  requestType?: RideRequestType; 
+  maxPassengers?: number; 
+  wasCreatedAsRecurring?: boolean; // New field for recurring ride indicator
 }
 
 export interface RideFirestoreData {
@@ -71,8 +72,9 @@ export interface RideFirestoreData {
   currentLongitude?: number;
   progress?: number;
   requestedBy?: string;
-  requestType?: RideRequestType; // New
-  maxPassengers?: number; // New
+  requestType?: RideRequestType; 
+  maxPassengers?: number; 
+  wasCreatedAsRecurring?: boolean; // New field
 }
 
 
@@ -83,3 +85,4 @@ export interface ChatMessage {
   text: string;
   timestamp: Timestamp;
 }
+
