@@ -180,7 +180,11 @@ export function RideCard({
         return (
           <div className="space-y-2">
             {onStartRide && (
-              <Button onClick={() => onStartRide(id)} size="sm" className="w-full">
+              <Button 
+                onClick={() => onStartRide(id)} 
+                size="sm" 
+                className="w-full bg-green-500 hover:bg-green-600 text-white"
+              >
                 <PlayCircle className="mr-2 h-4 w-4" /> Start Ride
               </Button>
             )}

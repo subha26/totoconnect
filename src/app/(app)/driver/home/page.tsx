@@ -202,9 +202,7 @@ export default function DriverHomePage() {
       <section>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-xl font-semibold text-foreground">Upcoming Rides</h2>
-          <Button onClick={() => router.push('/driver/post-ride')} className="bg-accent text-accent-foreground hover:bg-accent/90">
-            <PlusCircle className="mr-2 h-5 w-5" /> Post New Ride
-          </Button>
+          {/* Removed Post New Ride button from here */}
         </div>
         {driverUpcomingRides.length > 0 ? (
            <div className="flex overflow-x-auto space-x-4 pb-4 pt-1">

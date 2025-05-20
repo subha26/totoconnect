@@ -43,18 +43,17 @@ export function BottomNav() {
       <div className="flex justify-around items-center h-16 max-w-md mx-auto px-2">
         {navItems.map((item) => {
           if (item.isCentralButton) {
+            // Central button styling
+            const buttonBgClass = currentUser.role === 'driver' ? 'bg-accent text-accent-foreground hover:bg-accent/90' : 'bg-accent text-accent-foreground hover:bg-accent/90'; // Using accent for both roles now for the central button
+
             return (
               <Link
                 key={item.label}
                 href={item.href}
                 className={cn(
                   'flex flex-col items-center justify-center rounded-full transition-all transform',
-                  // Styling for the central button:
-                  // w-16 h-16 makes it larger and circular
-                  // -mt-6 pulls it upwards, making it overlap the nav bar top edge
-                  // bg-primary and text-primary-foreground for color
-                  // shadow-xl for a pronounced raised effect
-                  'w-16 h-16 -mt-6 bg-primary text-primary-foreground shadow-xl hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card'
+                  'w-16 h-16 -mt-6 shadow-xl focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-card',
+                  buttonBgClass 
                 )}
                 aria-current={pathname === item.href ? 'page' : undefined}
               >
@@ -85,3 +84,4 @@ export function BottomNav() {
     </nav>
   );
 }
+
