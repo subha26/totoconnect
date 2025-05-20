@@ -89,13 +89,13 @@ export default function DriverHomePage() {
 
   // For single ride deletion or "delete this instance only"
   const confirmDeleteSingleRide = async () => {
-    let rideIdToDelete = rideToDelete;
+    let rideIdToDeleteConfirmed = rideToDelete;
     if (rideForRecurringDeleteOptions && !rideToDelete) { // Coming from recurring options dialog "delete this instance"
-        rideIdToDelete = rideForRecurringDeleteOptions.id;
+        rideIdToDeleteConfirmed = rideForRecurringDeleteOptions.id;
     }
 
-    if (rideIdToDelete) {
-      const success = await deleteRide(rideIdToDelete);
+    if (rideIdToDeleteConfirmed) {
+      const success = await deleteRide(rideIdToDeleteConfirmed);
       if (success) {
         toast({ title: "Ride Deleted", description: "The ride has been successfully removed." });
       }
@@ -179,7 +179,7 @@ export default function DriverHomePage() {
   return (
     <div className="container mx-auto p-4 space-y-6">
       <header className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-primary">Driver Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-primary">Hello, {currentUser.name}!</h1>
       </header>
 
       {currentDriverRide && (
