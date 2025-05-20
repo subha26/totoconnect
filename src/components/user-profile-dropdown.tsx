@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, ScrollText } from 'lucide-react'; // Added ScrollText for Ride Log
 import type { User as AuthUser } from '@/lib/types';
 
 const getInitials = (name: string = "") => {
@@ -35,6 +35,10 @@ export function UserProfileDropdown() {
 
   const handleLogoutClick = () => {
     logout();
+  };
+
+  const handleDriverRideLogClick = () => {
+    router.push('/driver/ride-log');
   };
 
   const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
@@ -69,6 +73,12 @@ export function UserProfileDropdown() {
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
+        {currentUser.role === 'driver' && (
+          <DropdownMenuItem onClick={handleDriverRideLogClick} className="cursor-pointer">
+            <ScrollText className="mr-2 h-4 w-4" />
+            <span>Driver Ride Log</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogoutClick} className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10">
           <LogOut className="mr-2 h-4 w-4" />
@@ -78,4 +88,3 @@ export function UserProfileDropdown() {
     </DropdownMenu>
   );
 }
-
