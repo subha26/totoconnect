@@ -25,7 +25,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { addDays, format } from 'date-fns'; // Import addDays
+import { addDays, format, getDay } from 'date-fns';
 
 interface RideContextType {
   rides: Ride[];
@@ -38,7 +38,7 @@ interface RideContextType {
     origin: string, 
     destination: string, 
     totalSeats: number,
-    repeatForWeek: boolean
+    selectedDays: number[] // Changed from repeatForWeek: boolean
   ) => Promise<{success: boolean; message: string; createdRideIds: string[]}>;
   updateRideStatus: (rideId: string, status: RideStatus, progress?: number) => Promise<boolean>;
   acceptRideRequest: (rideId: string) => Promise<boolean>;
@@ -63,7 +63,7 @@ const RIDES_COLLECTION = "rides";
 export const RideProvider = ({ children }: { children: ReactNode }) => {
   const { currentUser } = useAuth();
   const [rides, setRides] = useState<Ride[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // This now primarily reflects initial load and real-time updates
+  const [isLoading, setIsLoading] = useState(true); 
   const { toast } = useToast();
   const prevRidesRef = useRef<Ride[]>([]); 
 
@@ -133,7 +133,6 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         return {success: false, rideId: null, message: "Departure time cannot be in the past."};
     }
 
-    // isLoading state for this specific action is handled locally in components or by global isLoading if preferred
     try {
       let rideTotalSeats: number;
       let rideMaxPassengers: number;
@@ -176,42 +175,35 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
-      // setIsLoading(true); // Consider local loading state for component
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists()) {
         toast({ title: "Ride not found", variant: "destructive"});
-        // setIsLoading(false);
         return false;
       }
       const rideData = rideSnap.data() as Ride;
 
       if (rideData.status !== 'Scheduled') {
         toast({ title: "Cannot Reserve", description: "This ride is not available for reservation.", variant: "destructive"});
-        // setIsLoading(false);
         return false;
       }
 
       if (rideData.passengers.find(p => p.userId === currentUser.id)) {
         toast({ title: "Already Reserved", description: "You have already reserved a seat on this ride.", variant: "destructive"});
-        // setIsLoading(false);
         return false; 
       }
 
       if (rideData.requestType === 'full_reserved') {
          toast({ title: "Private Ride", description: "This is a fully reserved private ride.", variant: "destructive"});
-         // setIsLoading(false);
          return false;
       }
       
       if (rideData.seatsAvailable <= 0) {
         toast({ title: "Ride Full", description: "No more seats available on this ride.", variant: "destructive"});
-        // setIsLoading(false);
         return false; 
       }
       
       if (rideData.passengers.length >= rideData.totalSeats) {
          toast({ title: "Ride Full", description: "This ride has reached its maximum passenger capacity.", variant: "destructive"});
-         // setIsLoading(false);
          return false;
       }
 
@@ -219,36 +211,30 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         seatsAvailable: rideData.seatsAvailable - 1,
         passengers: arrayUnion({ userId: currentUser.id, name: currentUser.name, phoneNumber: currentUser.phoneNumber }),
       });
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error reserving seat: ", error);
       toast({ title: "Reservation Error", description: "Could not reserve seat.", variant: "destructive"});
-      // setIsLoading(false);
       return false;
     }
   };
   
   const cancelReservation = async (rideId: string): Promise<boolean> => {
     if (!currentUser || currentUser.role !== 'passenger') return false;
-    // setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists()) {
-        // setIsLoading(false);
         return false;
       }
       const rideData = rideSnap.data() as Ride;
       const passengerToRemove = rideData.passengers.find(p => p.userId === currentUser.id);
 
       if (!passengerToRemove) {
-         // setIsLoading(false);
          return false; 
       }
       if (rideData.status !== 'Scheduled' && rideData.status !== 'About to Depart') {
         toast({ title: "Cancellation Not Allowed", description: "You can only cancel scheduled or about to depart rides.", variant: "destructive"});
-        // setIsLoading(false);
         return false;
       }
 
@@ -256,11 +242,9 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         seatsAvailable: rideData.seatsAvailable + 1,
         passengers: arrayRemove(passengerToRemove),
       });
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error cancelling reservation: ", error);
-      // setIsLoading(false);
       return false;
     }
   };
@@ -270,34 +254,53 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     origin: string, 
     destination: string, 
     totalSeats: number,
-    repeatForWeek: boolean
+    selectedDays: number[] // Array of day indices (0 for Sun, ..., 6 for Sat)
   ): Promise<{success: boolean; message: string; createdRideIds: string[]}> => {
     if (!currentUser || currentUser.role !== 'driver') {
       return { success: false, message: "User must be a driver.", createdRideIds: [] };
     }
 
-    let ridesToCreateDetails: { departureTime: Date, origin: string, destination: string, totalSeats: number, wasCreatedAsRecurring: boolean }[] = [];
     const createdRideIds: string[] = [];
     let successes = 0;
     let failures = 0;
     let duplicateCount = 0;
 
-    if (repeatForWeek) {
-      for (let i = 0; i < 7; i++) {
-        const rideDate = addDays(departureDateTime, i);
-        // Preserve original time, only change date part
-        const rideFullDateTime = new Date(departureDateTime);
-        rideFullDateTime.setDate(rideDate.getDate());
-        rideFullDateTime.setMonth(rideDate.getMonth());
-        rideFullDateTime.setFullYear(rideDate.getFullYear());
+    const ridesToAttemptDetails: { 
+      departureTime: Date, 
+      origin: string, 
+      destination: string, 
+      totalSeats: number, 
+      wasCreatedAsRecurring: boolean 
+    }[] = [];
 
-        ridesToCreateDetails.push({ departureTime: rideFullDateTime, origin, destination, totalSeats, wasCreatedAsRecurring: true });
-      }
+    if (selectedDays.length === 0) {
+      // Single ride posting
+      ridesToAttemptDetails.push({ departureTime: departureDateTime, origin, destination, totalSeats, wasCreatedAsRecurring: false });
     } else {
-      ridesToCreateDetails.push({ departureTime: departureDateTime, origin, destination, totalSeats, wasCreatedAsRecurring: false });
-    }
+      // Recurring rides for selected days of the week
+      selectedDays.forEach(dayIndex => { // dayIndex is 0 for Sun, 1 for Mon, ...
+        let actualOccurrenceDate = new Date(departureDateTime); // Start with the user's chosen date for day calculation
+        actualOccurrenceDate.setHours(0, 0, 0, 0); // Normalize to start of the day
 
-    for (const detail of ridesToCreateDetails) {
+        // Advance actualOccurrenceDate to the first instance of dayIndex that is on or after departureDateTime's date part
+        let daysToAdd = (dayIndex - getDay(actualOccurrenceDate) + 7) % 7;
+        actualOccurrenceDate = addDays(actualOccurrenceDate, daysToAdd);
+        
+        // Combine with original time from user's input
+        const rideDateTime = new Date(actualOccurrenceDate);
+        rideDateTime.setHours(departureDateTime.getHours(), departureDateTime.getMinutes(), 0, 0);
+
+        ridesToAttemptDetails.push({ 
+          departureTime: rideDateTime, 
+          origin, 
+          destination, 
+          totalSeats, 
+          wasCreatedAsRecurring: true 
+        });
+      });
+    }
+    
+    for (const detail of ridesToAttemptDetails) {
       const ridesRef = collection(db, RIDES_COLLECTION);
       const q = query(ridesRef, 
         where("driverId", "==", currentUser.id),
@@ -312,7 +315,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         console.warn(`Duplicate ride found for ${format(detail.departureTime, "PPp")}. Skipping.`);
         duplicateCount++;
         failures++;
-        continue; // Skip creating this ride
+        continue; 
       }
 
       const newRideData: RideFirestoreData = {
@@ -336,7 +339,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         createdRideIds.push(docRef.id);
         successes++;
       } catch (error) {
-        console.error("Error posting individual ride in series: ", error);
+        console.error("Error posting individual ride: ", error);
         failures++;
       }
     }
@@ -348,15 +351,16 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       message = `${successes} ride(s) posted. ${failures} ride(s) failed (duplicates or error).`;
     } else if (successes === 0 && failures > 0) {
       message = `No rides posted. ${failures} ride(s) failed (all were duplicates or errors).`;
+    } else if (successes === 0 && ridesToAttemptDetails.length === 0 ) {
+       message = "No rides were scheduled to be posted."; // Should not happen if logic is correct
     } else {
-      message = "No rides were scheduled to be posted.";
+       message = "No rides posted or attempted.";
     }
     
     return { success: successes > 0, message, createdRideIds };
   };
 
   const updateRideStatus = async (rideId: string, status: RideStatus, progress?: number): Promise<boolean> => {
-    // setIsLoading(true); // Consider local loading state
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
       const updateData: Partial<Ride> = { status };
@@ -364,11 +368,9 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         updateData.progress = progress;
       }
       await updateDoc(rideRef, updateData);
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error updating ride status: ", error);
-      // setIsLoading(false);
       return false;
     }
   };
@@ -378,36 +380,30 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
-      // setIsLoading(true);
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists()) {
         toast({ title: "Request Not Found", variant: "destructive" });
-        // setIsLoading(false);
         return false;
       }
       const rideData = rideSnap.data() as Ride;
 
       if (rideData.status !== 'Requested') {
          toast({ title: "Already Handled", description: "This request is no longer active.", variant: "destructive" });
-         // setIsLoading(false);
          return false; 
       }
       if (new Date(rideData.departureTime) < new Date()) {
         toast({ title: "Expired Request", description: "This ride request has expired.", variant: "destructive" });
         await updateDoc(rideRef, { status: 'Expired' });
-        // setIsLoading(false);
         return false;
       }
       if (!rideData.requestedBy) {
          toast({ title: "Invalid Request", description: "Requester information missing.", variant: "destructive" });
-         // setIsLoading(false);
          return false;
       }
 
       const requesterUserDoc = await getDoc(doc(db, "users", rideData.requestedBy));
       if (!requesterUserDoc.exists()) {
         toast({ title: "Requester Not Found", variant: "destructive" });
-        // setIsLoading(false);
         return false;
       }
       const requesterUserData = requesterUserDoc.data() as User;
@@ -435,60 +431,49 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         totalSeats: finalTotalSeats, 
         maxPassengers: rideData.requestType === 'full_reserved' ? 1 : (rideData.maxPassengers || DEFAULT_TOTAL_SEATS),
       });
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error accepting ride request: ", error);
       toast({ title: "Acceptance Error", description: "Could not accept the request.", variant: "destructive" });
-      // setIsLoading(false);
       return false;
     }
   };
 
   const updateRideDetails = async (rideId: string, details: Partial<RideFirestoreData>): Promise<boolean> => {
     if (!currentUser || currentUser.role !== 'driver') return false;
-    // setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
-        // setIsLoading(false);
         return false;
       }
       await updateDoc(rideRef, details);
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error updating ride details:", error);
-      // setIsLoading(false);
       return false;
     }
   };
 
   const deleteRide = async (rideId: string): Promise<boolean> => {
     if (!currentUser || currentUser.role !== 'driver') return false;
-    // setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists() || rideSnap.data().driverId !== currentUser.id) {
         toast({ title: "Error", description: "Ride not found or you're not authorized.", variant: "destructive" });
-        // setIsLoading(false);
         return false; 
       }
       if (rideSnap.data().passengers && rideSnap.data().passengers.length > 0) {
         toast({ title: "Cannot Delete", description: "This ride has passengers. Please cancel it instead or remove passengers first.", variant: "destructive" });
-        // setIsLoading(false);
         return false;
       }
       await deleteDoc(rideRef);
-      toast({ title: "Ride Deleted", description: "The ride offer has been removed." });
-      // setIsLoading(false);
+      // Toast is shown by component now
       return true;
     } catch (error) {
       console.error("Error deleting ride: ", error);
       toast({ title: "Deletion Failed", description: "Could not delete the ride.", variant: "destructive" });
-      // setIsLoading(false);
       return false;
     }
   };
@@ -498,29 +483,24 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Unauthorized", description: "Only passengers can delete their requests.", variant: "destructive" });
       return false;
     }
-    // setIsLoading(true);
     const rideRef = doc(db, RIDES_COLLECTION, rideId);
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists()) {
         toast({ title: "Request Not Found", variant: "destructive" });
-        // setIsLoading(false);
         return false;
       }
       const rideData = rideSnap.data() as Ride;
       if (rideData.requestedBy !== currentUser.id || rideData.status !== 'Requested') {
         toast({ title: "Cannot Delete", description: "This request cannot be deleted or does not belong to you.", variant: "destructive" });
-        // setIsLoading(false);
         return false;
       }
       await deleteDoc(rideRef);
       toast({ title: "Request Deleted", description: "Your ride request has been successfully deleted." });
-      // setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error deleting ride request:", error);
       toast({ title: "Deletion Failed", description: "Could not delete the ride request.", variant: "destructive" });
-      // setIsLoading(false);
       return false;
     }
   };

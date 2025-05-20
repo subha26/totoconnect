@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
+// import { Checkbox } from "@/components/ui/checkbox"; // Removed Checkbox
 import { useRides } from '@/contexts/ride-context';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarFold, MapPin, Users, PlusCircleIcon, Repeat } from 'lucide-react';
@@ -18,17 +18,20 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
 export default function PostRidePage() {
   const router = useRouter();
-  const { postRide } = useRides(); // isLoading is now handled internally by postRide
+  const { postRide } = useRides(); 
   const { toast } = useToast();
   
   const [origin, setOrigin] = useState<string>(LOCATIONS.MAIN_ROAD);
   const [destination, setDestination] = useState<string>(LOCATIONS.COLLEGE);
-  const [departureDate, setDepartureDate] = useState<Date | undefined>(new Date(Date.now() + 60 * 60 * 1000)); // Default to 1 hour from now
+  const [departureDate, setDepartureDate] = useState<Date | undefined>(new Date(Date.now() + 60 * 60 * 1000)); 
   const [timeString, setTimeString] = useState<string>(format(new Date(Date.now() + 60 * 60 * 1000), "HH:mm"));
   const [totalSeats, setTotalSeats] = useState<number>(DEFAULT_TOTAL_SEATS);
-  const [repeatForWeek, setRepeatForWeek] = useState<boolean>(false);
+  // const [repeatForWeek, setRepeatForWeek] = useState<boolean>(false); // Removed
+  const [selectedDays, setSelectedDays] = useState<Set<number>>(new Set()); // 0 for Sunday, ..., 6 for Saturday
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
 
@@ -38,6 +41,18 @@ export default function PostRidePage() {
 
   const handleDateSelect = (date: Date | undefined) => {
     setDepartureDate(date);
+  };
+
+  const toggleDaySelection = (dayIndex: number) => {
+    setSelectedDays(prevSelectedDays => {
+      const newSelectedDays = new Set(prevSelectedDays);
+      if (newSelectedDays.has(dayIndex)) {
+        newSelectedDays.delete(dayIndex);
+      } else {
+        newSelectedDays.add(dayIndex);
+      }
+      return newSelectedDays;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,16 +81,20 @@ export default function PostRidePage() {
     }
 
     setIsSubmitting(true);
-    const result = await postRide(finalDepartureDateTime, origin, destination, totalSeats, repeatForWeek);
+    const result = await postRide(finalDepartureDateTime, origin, destination, totalSeats, Array.from(selectedDays));
     setIsSubmitting(false);
 
     if (result.success) {
-      toast({ title: "Ride(s) Posted!", description: result.message });
+      toast({ title: "Ride(s) Action Complete", description: result.message });
       router.push('/driver/home');
     } else {
       toast({ title: "Post Failed", description: result.message || "Could not post ride(s). Please try again.", variant: "destructive" });
     }
   };
+
+  const postButtonText = selectedDays.size > 0 ? `Post ${selectedDays.size > 1 ? selectedDays.size + ' Recurring Rides' : 'Recurring Ride'}` : "Post Ride";
+  const submittingButtonText = selectedDays.size > 0 ? "Posting Rides..." : "Posting Ride...";
+
 
   return (
     <div className="container mx-auto p-4">
@@ -84,7 +103,7 @@ export default function PostRidePage() {
           <CardTitle className="text-2xl font-semibold text-primary flex items-center">
             <PlusCircleIcon className="mr-2 h-6 w-6" /> Post a New Ride
           </CardTitle>
-          <CardDescription>Offer a ride to passengers by providing details below.</CardDescription>
+          <CardDescription>Offer a ride to passengers by providing details below. You can also set it to recur on specific days of the week.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -136,7 +155,7 @@ export default function PostRidePage() {
                     </Popover>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="departureTimeField" className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" />Time</Label> {/* Icon might be better as Clock */}
+                    <Label htmlFor="departureTimeField" className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" />Time</Label> 
                     <Input id="departureTimeField" type="time" value={timeString} onChange={handleTimeChange} required />
                 </div>
             </div>
@@ -153,20 +172,31 @@ export default function PostRidePage() {
                 required 
               />
             </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="repeatForWeek" 
-                checked={repeatForWeek} 
-                onCheckedChange={(checked) => setRepeatForWeek(checked as boolean)}
-              />
-              <Label htmlFor="repeatForWeek" className="font-normal flex items-center">
-                <Repeat className="mr-2 h-4 w-4 text-primary" /> Repeat for the next 7 days
-              </Label>
+            
+            <div className="space-y-2">
+              <Label className="flex items-center"><Repeat className="mr-2 h-4 w-4 text-primary" />Repeat on Days (Optional)</Label>
+              <div className="flex justify-between space-x-1">
+                {DAY_LABELS.map((label, index) => (
+                  <Button
+                    key={index}
+                    type="button"
+                    variant={selectedDays.has(index) ? "default" : "outline"}
+                    size="icon"
+                    className="w-9 h-9 rounded-full"
+                    onClick={() => toggleDaySelection(index)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+               <p className="text-xs text-muted-foreground">
+                If days are selected, rides will be posted for the next occurrence of these days, on or after the chosen date.
+              </p>
             </div>
 
+
             <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-3 text-lg" disabled={isSubmitting}>
-              {isSubmitting ? (repeatForWeek ? 'Posting Rides...' : 'Posting Ride...') : (repeatForWeek ? 'Post 7 Rides' : 'Post Ride')}
+              {isSubmitting ? submittingButtonText : postButtonText}
             </Button>
           </form>
         </CardContent>
