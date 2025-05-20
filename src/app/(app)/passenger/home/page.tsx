@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { isSameDay } from 'date-fns';
 
 
 export default function PassengerHomePage() {
@@ -87,10 +88,11 @@ export default function PassengerHomePage() {
 
   const availableRides = useMemo(() => {
     if (!currentUser) return [];
-    const now = new Date();
+    const today = new Date();
     const potentiallyAvailable = allRides.filter(ride => 
       ride.status === 'Scheduled' &&
-      new Date(ride.departureTime) >= now &&
+      isSameDay(new Date(ride.departureTime), today) && // Show only today's rides
+      new Date(ride.departureTime) >= today && // Ensure it's not in the past today
       ride.seatsAvailable > 0 &&
       !ride.passengers.find(p => p.userId === currentUser.id) &&
       ride.driverId !== currentUser.id &&
@@ -170,7 +172,7 @@ export default function PassengerHomePage() {
 
       <section>
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-xl font-semibold text-foreground">Available Rides</h2>
+          <h2 className="text-xl font-semibold text-foreground">Available Rides for Today</h2>
         </div>
         {availableRides.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -188,14 +190,12 @@ export default function PassengerHomePage() {
         ) : (
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
-              <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty street illustration" />
-              <p className="text-muted-foreground">No scheduled rides available right now. Try requesting one!</p>
+              <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty street calendar" />
+              <p className="text-muted-foreground">No scheduled rides available for today. Try requesting one!</p>
             </CardContent>
           </Card>
         )}
       </section>
-
-      {/* Request Ride button removed from here, moved to BottomNav */}
 
       {currentUser && chatRideId && (
         <ChatModal
