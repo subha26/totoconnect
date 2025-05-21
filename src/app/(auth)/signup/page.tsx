@@ -93,7 +93,7 @@ export default function SignupPage() {
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="10-digit mobile number"
+              placeholder="9876543210"
               maxLength={10}
               required
               className="text-lg"

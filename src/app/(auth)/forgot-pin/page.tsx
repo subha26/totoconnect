@@ -93,14 +93,14 @@ export default function ForgotPinPage() {
             <div className="space-y-2">
               <Label htmlFor="phoneNumber" className="flex items-center">
                 <Phone className="mr-2 h-5 w-5 text-primary" />
-                Registered Phone Number
+                Registered Phone Number (10 digits)
               </Label>
               <Input
                 id="phoneNumber"
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="10-digit mobile number"
+                placeholder="9876543210"
                 maxLength={10}
                 required
                 className="text-lg"

@@ -239,12 +239,15 @@ export default function ProfilePage() {
               <div className="flex-grow">
                   <p className="text-xs text-muted-foreground">Phone Number</p>
                   {!isEditingPhoneNumber ? (
-                    <p className="font-semibold text-foreground">{currentUser.phoneNumber}</p>
+                    <p className="font-semibold text-foreground">
+                      {currentUser.phoneNumber ? `+91 ${currentUser.phoneNumber}` : 'N/A'}
+                    </p>
                   ) : (
                     <Input
                       type="tel"
                       value={newPhoneNumber}
                       onChange={(e) => setNewPhoneNumber(e.target.value)}
+                      placeholder="9876543210"
                       maxLength={10}
                       className="font-semibold text-foreground h-auto p-0 border-none bg-transparent shadow-none focus:ring-0 focus:ring-offset-0"
                     />
@@ -385,4 +388,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

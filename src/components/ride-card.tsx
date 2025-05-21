@@ -4,7 +4,8 @@
 import type { Ride, UserRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck, Lock, Repeat } from 'lucide-react'; // Added Repeat
+import { Label } from '@/components/ui/label';
+import { Clock, MapPin, Users, Phone, MessageSquare, CheckCircle, XCircle, PlayCircle, Flag, Check, CircleDot, Hourglass, Car, Edit, Trash2, UserCheck, ShieldCheck, Lock, Repeat } from 'lucide-react';
 import { format } from 'date-fns';
 import { LOCATIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -88,7 +89,9 @@ export function RideCard({
     }
 
     if (phoneNumberToCall) {
-      window.location.href = `tel:${phoneNumberToCall}`;
+      // Ensure +91 prefix for Indian numbers if it's not already there
+      const formattedPhoneNumber = phoneNumberToCall.startsWith('+91') ? phoneNumberToCall : `+91${phoneNumberToCall}`;
+      window.location.href = `tel:${formattedPhoneNumber}`;
     } else {
       toast({ title: "Cannot make call", description: "Contact information is not available.", variant: "destructive" });
     }
@@ -323,4 +326,3 @@ export function RideCard({
     </Card>
   );
 }
-

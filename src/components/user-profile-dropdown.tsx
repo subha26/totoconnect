@@ -64,7 +64,7 @@ export function UserProfileDropdown() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none text-foreground">{currentUser.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {currentUser.phoneNumber}
+              {currentUser.phoneNumber ? `+91 ${currentUser.phoneNumber}` : 'N/A'}
             </p>
           </div>
         </DropdownMenuLabel>

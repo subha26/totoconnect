@@ -111,7 +111,9 @@ export default function RideDetailPage() {
     }
 
     if (phoneNumberToCall) {
-      window.location.href = `tel:${phoneNumberToCall}`;
+      // Ensure +91 prefix for Indian numbers if it's not already there
+      const formattedPhoneNumber = phoneNumberToCall.startsWith('+91') ? phoneNumberToCall : `+91${phoneNumberToCall}`;
+      window.location.href = `tel:${formattedPhoneNumber}`;
     } else {
       toast({ title: "Contact Unavailable", description: "Phone number not found for this contact." });
     }
@@ -193,7 +195,7 @@ export default function RideDetailPage() {
               {ride.driverName ? (
                 <>
                   <p className="flex items-center text-sm"><User className="inline mr-2 h-4 w-4 text-muted-foreground"/>Name: {ride.driverName}</p>
-                  <p className="flex items-center text-sm"><Phone className="inline mr-2 h-4 w-4 text-muted-foreground"/>Phone: {ride.driverPhoneNumber || 'N/A'}</p>
+                  <p className="flex items-center text-sm"><Phone className="inline mr-2 h-4 w-4 text-muted-foreground"/>Phone: {ride.driverPhoneNumber ? `+91 ${ride.driverPhoneNumber}` : 'N/A'}</p>
                 </>
               ) : ride.status === 'Requested' ? (
                  <p className="text-sm text-muted-foreground">Awaiting driver assignment...</p>
@@ -223,7 +225,7 @@ export default function RideDetailPage() {
           </div>
           
           {(isPassenger || (isRideOwnerDriver)) && ride.status !== 'Completed' && ride.status !== 'Cancelled' && (
-             <div className="grid grid-cols-2 gap-3 pt-4 mt-4">
+             <div className="grid grid-cols-2 gap-3 pt-2">
                 <Button 
                   variant="outline"
                   onClick={handleCall}
@@ -281,6 +283,3 @@ export default function RideDetailPage() {
     </div>
   );
 }
-
-
-    
