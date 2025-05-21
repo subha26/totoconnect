@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/auth-context';
 import type { Ride } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-// import { Progress } from '@/components/ui/progress'; // Removed Progress import
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
@@ -37,8 +36,8 @@ export default function RideDetailPage() {
       const foundRide = getRideById(rideId);
       setRide(foundRide);
     }
-  }, [rideId, getRideById, ridesLoading, currentUser, /* rides needed here to re-render if ride list changes */ ]); 
-  // Added rides to dependency array if getRideById might return different object for same id if rides list updated from context
+  }, [rideId, getRideById, ridesLoading, currentUser, ]); 
+  // Removed 'rides' from dependency array as getRideById should be stable if rides itself hasn't changed in a way that affects this specific ride's data directly.
 
   const isLoading = ridesLoading || authLoading || ride === undefined;
 
@@ -64,7 +63,6 @@ export default function RideDetailPage() {
           <CardContent className="space-y-3">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-16 w-full" />
-            {/* <Skeleton className="h-4 w-full" /> Removed skeleton for progress bar area */}
           </CardContent>
           <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
         </Card>
@@ -101,7 +99,6 @@ export default function RideDetailPage() {
       phoneNumberToCall = ride.driverPhoneNumber;
     } else if (isRideOwnerDriver) {
       if (ride.passengers.length > 0 && ride.passengers[0].phoneNumber) {
-        // For simplicity, calling the first passenger. A real app might list passengers to call individually.
         phoneNumberToCall = ride.passengers[0].phoneNumber;
       } else if (ride.passengers.length === 0) {
         toast({ title: "No Passengers", description: "There are no passengers to call for this ride." });
@@ -123,7 +120,7 @@ export default function RideDetailPage() {
   const handleReserve = async () => {
     const success = await reserveSeat(ride.id);
     if (success) toast({ title: "Seat Reserved!" }); else toast({ title: "Reservation Failed", variant: "destructive" });
-    setRide(getRideById(rideId)); // Refresh ride details
+    setRide(getRideById(rideId)); 
   };
 
   const handleCancel = async () => {
@@ -133,13 +130,13 @@ export default function RideDetailPage() {
   };
 
   const handleStart = async () => {
-    const success = await updateRideStatus(ride.id, 'On Route', 10); // Progress value might be vestigial now
+    const success = await updateRideStatus(ride.id, 'On Route', 10); 
     if (success) toast({ title: "Ride Started!" }); else toast({ title: "Failed to Start Ride", variant: "destructive" });
     setRide(getRideById(rideId));
   };
 
   const handleComplete = async () => {
-    const success = await updateRideStatus(ride.id, 'Completed', 100); // Progress value might be vestigial now
+    const success = await updateRideStatus(ride.id, 'Completed', 100); 
     if (success) toast({ title: "Ride Completed!" }); else toast({ title: "Failed to Complete Ride", variant: "destructive" });
     setRide(getRideById(rideId));
   };
@@ -150,6 +147,14 @@ export default function RideDetailPage() {
     setRide(getRideById(rideId));
   };
 
+  const hasActions = (isPassenger && ride.status === 'Scheduled' && !passengerIsOnThisRide && ride.seatsAvailable > 0) ||
+                     (isPassenger && passengerIsOnThisRide && (ride.status === 'Scheduled' || ride.status === 'About to Depart')) ||
+                     (isDriver && ride.status === 'Requested' && !isRideOwnerDriver) ||
+                     (isDriver && isRideOwnerDriver && ride.status === 'Scheduled') ||
+                     (isDriver && isRideOwnerDriver && ride.status === 'On Route') ||
+                     (isDriver && isRideOwnerDriver && (ride.status === 'Scheduled' || ride.status === 'About to Depart' || ride.status === 'On Route'));
+
+
   return (
     <div className="container mx-auto p-4">
       <Button onClick={() => router.back()} variant="outline" size="sm" className="mb-4">
@@ -159,7 +164,7 @@ export default function RideDetailPage() {
         <CardHeader className="bg-primary/10 p-6">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-2xl text-primary mb-1">
+              <CardTitle className="text-xl md:text-2xl text-primary mb-1">
                 {ride.origin} to {ride.destination}
               </CardTitle>
               <CardDescription className="text-sm text-muted-foreground flex items-center">
@@ -172,49 +177,42 @@ export default function RideDetailPage() {
               ride.status === 'Cancelled' ? 'bg-red-600' :
               ride.status === 'On Route' ? 'bg-blue-600 animate-pulse' :
               ride.status === 'Requested' ? 'bg-orange-500' :
-              'bg-yellow-600'
+              'bg-yellow-600' // Default for Scheduled, About to Depart etc.
             }`}>
               {ride.status}
             </span>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          {/* Ride Progress Bar section removed */}
-          {/* {ride.status === 'On Route' && (
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-muted-foreground">RIDE PROGRESS</Label>
-              <div className="flex items-center space-x-3 text-sm">
-                <MapPin className="h-5 w-5 text-primary" /> <span className="truncate w-1/3">{ride.origin}</span>
-                // Progress component was here
-                <MapPin className="h-5 w-5 text-primary" /> <span className="truncate w-1/3 text-right">{ride.destination}</span>
-              </div>
-            </div>
-          )} */}
-
-
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h3 className="font-semibold text-foreground flex items-center"><Car className="mr-2 h-5 w-5 text-primary" />Driver Details</h3>
+            <div className="space-y-3 p-4 bg-secondary/30 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
+                <Car className="mr-2 h-5 w-5" />Driver Details
+              </h3>
               {ride.driverName ? (
                 <>
-                  <p><User className="inline mr-2 h-4 w-4 text-muted-foreground"/>Name: {ride.driverName}</p>
-                  <p><Phone className="inline mr-2 h-4 w-4 text-muted-foreground"/>Phone: {ride.driverPhoneNumber || 'N/A'}</p>
+                  <p className="flex items-center text-sm"><User className="inline mr-2 h-4 w-4 text-muted-foreground"/>Name: {ride.driverName}</p>
+                  <p className="flex items-center text-sm"><Phone className="inline mr-2 h-4 w-4 text-muted-foreground"/>Phone: {ride.driverPhoneNumber || 'N/A'}</p>
                 </>
               ) : ride.status === 'Requested' ? (
-                 <p className="text-muted-foreground">Awaiting driver assignment...</p>
+                 <p className="text-sm text-muted-foreground">Awaiting driver assignment...</p>
               ) : (
-                <p className="text-muted-foreground">Driver details not available.</p>
+                <p className="text-sm text-muted-foreground">Driver details not available.</p>
               )}
             </div>
-            <div className="space-y-3">
-              <h3 className="font-semibold text-foreground flex items-center"><Users className="mr-2 h-5 w-5 text-primary" />Ride Capacity</h3>
-              <p>Seats Available: {ride.seatsAvailable} / {ride.totalSeats}</p>
+            <div className="space-y-3 p-4 bg-secondary/30 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold text-primary flex items-center mb-2">
+                <Users className="mr-2 h-5 w-5" />Ride Capacity
+              </h3>
+              <p className="text-sm">Seats Available: {ride.seatsAvailable} / {ride.totalSeats}</p>
               {ride.status !== 'Requested' && ride.passengers.length > 0 && (
                 <div>
-                    <h4 className="text-sm font-medium mt-2 mb-1">Passengers ({ride.passengers.length}):</h4>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground max-h-24 overflow-y-auto">
-                        {ride.passengers.map(p => <li key={p.userId}>{p.name}</li>)}
-                    </ul>
+                    <h4 className="text-sm font-medium mt-2 mb-1 text-muted-foreground">Passengers ({ride.passengers.length}):</h4>
+                    <ScrollArea className="max-h-24 text-sm">
+                      <ul className="list-disc list-inside text-muted-foreground space-y-1">
+                          {ride.passengers.map(p => <li key={p.userId}>{p.name}</li>)}
+                      </ul>
+                    </ScrollArea>
                 </div>
               )}
               {ride.status === 'Requested' && ride.requestedBy && (
@@ -238,7 +236,7 @@ export default function RideDetailPage() {
           )}
 
         </CardContent>
-        <CardFooter className="p-6 bg-secondary/30">
+        <CardFooter className={hasActions ? "p-4 border-t" : "p-6 bg-secondary/30"}>
           {/* Passenger Actions */}
           {isPassenger && ride.status === 'Scheduled' && !passengerIsOnThisRide && ride.seatsAvailable > 0 && (
             <Button onClick={handleReserve} className="w-full bg-accent text-accent-foreground hover:bg-accent/90"><CheckCircle className="mr-2 h-4 w-4" />Reserve Spot</Button>
@@ -248,7 +246,7 @@ export default function RideDetailPage() {
           )}
 
           {/* Driver Actions */}
-          {isDriver && ride.status === 'Requested' && !isRideOwnerDriver && ( // Ensure driver is not the one who posted this requested ride (if logic allows)
+          {isDriver && ride.status === 'Requested' && !isRideOwnerDriver && ( 
             <Button onClick={handleAccept} className="w-full bg-green-500 hover:bg-green-600 text-white"><CheckCircle className="mr-2 h-4 w-4" />Accept Ride Request</Button>
           )}
           {isDriver && isRideOwnerDriver && ride.status === 'Scheduled' && (
@@ -283,3 +281,5 @@ export default function RideDetailPage() {
   );
 }
 
+
+    
