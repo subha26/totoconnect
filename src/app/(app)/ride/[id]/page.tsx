@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { ChatModal } from '@/components/chat-modal'; // Import ChatModal
+import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
 
 export default function RideDetailPage() {
   const params = useParams();
