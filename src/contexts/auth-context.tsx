@@ -14,6 +14,7 @@ import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp }
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage"; // Firebase Storage functions
 import { TEST_PASSENGER_PHONE, TEST_PASSENGER_PIN, TEST_PASSENGER_NAME, TEST_DRIVER_PHONE, TEST_DRIVER_PIN, TEST_DRIVER_NAME, SECURITY_QUESTIONS } from '@/lib/constants';
 import { isSameDay } from 'date-fns';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 
 interface AuthContextType {
@@ -38,24 +39,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const rehydrateUserTimestamps = (data: any): User => {
   const userData = { ...data } as User;
 
-  if (userData.phoneNumberLastUpdatedAt && typeof userData.phoneNumberLastUpdatedAt === 'object' && ! (userData.phoneNumberLastUpdatedAt instanceof Timestamp) ) {
-      // Check if it's a plain object from JSON.parse (likely { seconds: ..., nanoseconds: ... })
-      if ('seconds' in userData.phoneNumberLastUpdatedAt && 'nanoseconds' in userData.phoneNumberLastUpdatedAt) {
-        userData.phoneNumberLastUpdatedAt = new Timestamp(
-            (userData.phoneNumberLastUpdatedAt as any).seconds,
-            (userData.phoneNumberLastUpdatedAt as any).nanoseconds
-        );
-      } else {
-        // If it's an object but not a recognizable Timestamp structure, nullify or handle error
-        userData.phoneNumberLastUpdatedAt = null; 
-      }
-  } else if (userData.phoneNumberLastUpdatedAt && !(userData.phoneNumberLastUpdatedAt instanceof Timestamp)) {
-      // If it exists but is not a Timestamp object (e.g., it's an ISO string from older data or incorrect type)
-      // Attempt to convert if it's a valid date string, otherwise nullify.
-      // This part might need adjustment based on how non-Timestamp dates were stored.
-      // For now, if it's not already a Timestamp and not the plain object, assume it needs rehydration or is invalid.
-      try {
-        const date = new Date(userData.phoneNumberLastUpdatedAt as any);
+  if (userData.phoneNumberLastUpdatedAt && typeof userData.phoneNumberLastUpdatedAt === 'object' && !(userData.phoneNumberLastUpdatedAt instanceof Timestamp)) {
+    if ('seconds' in userData.phoneNumberLastUpdatedAt && 'nanoseconds' in userData.phoneNumberLastUpdatedAt) {
+      userData.phoneNumberLastUpdatedAt = new Timestamp(
+        (userData.phoneNumberLastUpdatedAt as any).seconds,
+        (userData.phoneNumberLastUpdatedAt as any).nanoseconds
+      );
+    } else {
+      userData.phoneNumberLastUpdatedAt = null;
+    }
+  } else if (userData.phoneNumberLastUpdatedAt && typeof userData.phoneNumberLastUpdatedAt === 'string') {
+    // Attempt to parse if it's an ISO string (less likely with Firestore but good to handle)
+    try {
+        const date = new Date(userData.phoneNumberLastUpdatedAt);
         if (!isNaN(date.getTime())) {
           userData.phoneNumberLastUpdatedAt = Timestamp.fromDate(date);
         } else {
@@ -65,6 +61,11 @@ const rehydrateUserTimestamps = (data: any): User => {
         userData.phoneNumberLastUpdatedAt = null;
       }
   }
+  // Ensure it's either a Timestamp or null
+  if (userData.phoneNumberLastUpdatedAt && !(userData.phoneNumberLastUpdatedAt instanceof Timestamp)) {
+      userData.phoneNumberLastUpdatedAt = null;
+  }
+
   return userData;
 };
 
@@ -74,26 +75,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [firebaseUser, setFirebaseUser] = useState<import('firebase/auth').User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast(); // Get toast function
 
   useEffect(() => {
     setIsLoading(true);
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
-      if (fbUser && fbUser.phoneNumber) { 
-        const userDocRef = doc(db, "users", fbUser.phoneNumber.startsWith('+91') ? fbUser.phoneNumber.substring(3) : fbUser.phoneNumber); 
+      if (fbUser && fbUser.phoneNumber) {
+        // If Firebase Auth user exists, try to load corresponding Firestore user
+        // Prioritize phone number from Firebase Auth if available, otherwise use fbUser.uid as fallback key if your Firestore uses uids
+        const userKey = fbUser.phoneNumber.startsWith('+91') ? fbUser.phoneNumber.substring(3) : fbUser.phoneNumber;
+        const userDocRef = doc(db, "users", userKey);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const appUser = rehydrateUserTimestamps(userDocSnap.data() as User);
           setCurrentUser(appUser);
-          localStorage.setItem('totoConnectUser', JSON.stringify(appUser)); 
+          localStorage.setItem('totoConnectUser', JSON.stringify(appUser));
         } else {
-          // If Firebase user exists but no Firestore doc, maybe it's a new Firebase Auth user
-          // For this app's logic, we primarily rely on our Firestore user store.
-          // If no Firestore doc, treat as no app user.
-           setCurrentUser(null);
-           localStorage.removeItem('totoConnectUser');
+          // Firebase user exists but no Firestore doc. This state might need specific handling depending on app flow.
+          // For now, if app primarily relies on its own Firestore user store, treat as no app user.
+          setCurrentUser(null);
+          localStorage.removeItem('totoConnectUser');
         }
-      } else { 
+      } else {
         // No Firebase Auth user, check localStorage for app's custom session
         const storedUserString = localStorage.getItem('totoConnectUser');
         if (storedUserString) {
@@ -124,8 +128,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCurrentUser(userData);
         localStorage.setItem('totoConnectUser', JSON.stringify(userData));
         // NOTE: This custom login does NOT sign the user into Firebase Auth.
-        // Operations requiring Firebase Auth (like Storage with restrictive rules) may fail
-        // if there's no separate Firebase Auth session.
         setIsLoading(false);
         router.push(userData.role === 'driver' ? '/driver/home' : '/passenger/home');
         return true;
@@ -173,13 +175,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const newUser: User = {
-        id: phoneNumber,
+        id: phoneNumber, // Using phone number as ID
         phoneNumber,
         name,
         pin,
         role,
-        profilePictureUrl: null, 
-        phoneNumberLastUpdatedAt: null, 
+        profilePictureUrl: null,
+        phoneNumberLastUpdatedAt: null,
         securityQuestion,
         securityAnswer,
       };
@@ -201,7 +203,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const changeProfilePicture = async (file: File): Promise<boolean> => {
     if (!currentUser) return false;
     
-    // Log current Firebase Auth user state for debugging
     console.log("Attempting to upload profile picture. Current app user:", currentUser.id, "Firebase Auth user:", auth.currentUser);
 
     setIsLoading(true);
@@ -221,8 +222,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       setIsLoading(false);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error changing profile picture:", error);
+      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found') { // object-not-found can sometimes mask auth issues if rules are very restrictive
+        toast({
+          title: "Upload Failed: Permission Denied",
+          description: "Could not upload profile picture. This usually means you're not fully authenticated with Firebase services. Please ensure Firebase Auth session is active.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: "Could not update profile picture. Please try again.",
+          variant: "destructive",
+        });
+      }
       setIsLoading(false);
       return false;
     }
@@ -289,22 +303,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const oldUserData = rehydrateUserTimestamps(oldUserDocSnap.data() as User);
       
-
       const updatedUserData: User = {
         ...oldUserData,
-        id: newPhoneNumber,
+        id: newPhoneNumber, // Update the ID to the new phone number
         phoneNumber: newPhoneNumber,
-        phoneNumberLastUpdatedAt: serverTimestamp() as Timestamp, // This will be a server timestamp placeholder
+        phoneNumberLastUpdatedAt: serverTimestamp() as Timestamp,
       };
 
       await setDoc(newPhoneUserDocRef, updatedUserData);
       await deleteDoc(oldUserDocRef);
       
-      // For immediate client-side update, use a client-generated timestamp or fetch the doc again.
-      // Using client-generated for simplicity here, but serverTimestamp is better for accuracy.
       const displayUserData: User = {
         ...updatedUserData,
-        phoneNumberLastUpdatedAt: Timestamp.now(), // Simulate what serverTimestamp would do for local state
+        phoneNumberLastUpdatedAt: Timestamp.now(), 
       };
 
       setCurrentUser(rehydrateUserTimestamps(displayUserData)); 
@@ -338,9 +349,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(userDocRef, { pin: newPin });
       setCurrentUser(prev => {
          if (!prev) return null;
-         const updatedUser = { ...prev, pin: newPin };
+         const updatedUser = rehydrateUserTimestamps({ ...prev, pin: newPin });
          localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
-         return rehydrateUserTimestamps(updatedUser);
+         return updatedUser;
       });
       setIsLoading(false);
       return { success: true, message: "PIN changed successfully." };
@@ -369,9 +380,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(userDocRef, { securityQuestion: question, securityAnswer: answer });
       setCurrentUser(prev => {
         if(!prev) return null;
-        const updatedUser = { ...prev, securityQuestion: question, securityAnswer: answer };
+        const updatedUser = rehydrateUserTimestamps({ ...prev, securityQuestion: question, securityAnswer: answer });
         localStorage.setItem('totoConnectUser', JSON.stringify(updatedUser));
-        return rehydrateUserTimestamps(updatedUser);
+        return updatedUser;
       });
       setIsLoading(false);
       return { success: true, message: "Security question and answer updated." };
@@ -439,11 +450,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!userSnap.exists()) {
         await setDoc(userRef, {
           ...mockUser,
-          id: mockUser.phoneNumber,
-          profilePictureUrl: null, 
-          phoneNumberLastUpdatedAt: null, 
-          securityQuestion: SECURITY_QUESTIONS[0], 
-          securityAnswer: "testanswer" 
+          id: mockUser.phoneNumber, // Ensure id is set to phone number
+          profilePictureUrl: mockUser.profilePictureUrl || null, 
+          phoneNumberLastUpdatedAt: mockUser.phoneNumberLastUpdatedAt || null, 
+          securityQuestion: mockUser.securityQuestion || SECURITY_QUESTIONS[0], 
+          securityAnswer: mockUser.securityAnswer || "testanswer" 
         });
         console.log(`Mock user ${mockUser.name} added to Firestore with ID ${mockUser.phoneNumber}.`);
       }
@@ -453,8 +464,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const driverMockForDb: User = { id: TEST_DRIVER_PHONE, phoneNumber: TEST_DRIVER_PHONE, name: TEST_DRIVER_NAME, pin: TEST_DRIVER_PIN, role: 'driver', profilePictureUrl: null, securityQuestion: SECURITY_QUESTIONS[0], securityAnswer: "testanswer" };
     
     // Seed users if they don't exist
-    // seedMockUser(passengerMockForDb); // Comment out if not needed or if Firebase Auth is primary
-    // seedMockUser(driverMockForDb);   // Comment out if not needed
+    // seedMockUser(passengerMockForDb);
+    // seedMockUser(driverMockForDb);
   }, []);
 
 
@@ -488,3 +499,5 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
+      
+    
