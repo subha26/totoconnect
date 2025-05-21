@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Added useRef
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Phone, Briefcase, LogOut, Camera, Edit3, Save, XCircle, KeyRound, ShieldQuestion, MessageCircle } from 'lucide-react';
+import { User, Phone, Briefcase, LogOut, Camera, Edit3, Save, XCircle, KeyRound, ShieldQuestion, MessageCircle, UploadCloud } from 'lucide-react'; // Added UploadCloud
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,28 +15,30 @@ import type { UserRole } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, isSameDay } from 'date-fns';
-import { Timestamp } from 'firebase/firestore'; // Keep Timestamp for type assertion
+import { Timestamp } from 'firebase/firestore'; 
 import { SECURITY_QUESTIONS } from '@/lib/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import Image from 'next/image'; // For image preview
 
 export default function ProfilePage() {
   const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole, updatePhoneNumber, changePin, updateSecurityQA } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
-  // Phone Number Edit State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const [isEditingPhoneNumber, setIsEditingPhoneNumber] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [phoneEditError, setPhoneEditError] = useState<string | null>(null);
   const [canUpdatePhoneNumberToday, setCanUpdatePhoneNumberToday] = useState(true);
 
-  // Change PIN State
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmNewPin, setConfirmNewPin] = useState('');
   const [isChangingPin, setIsChangingPin] = useState(false);
 
-  // Security Question/Answer State
   const [currentSecurityQuestion, setCurrentSecurityQuestion] = useState('');
   const [newSecurityQuestion, setNewSecurityQuestion] = useState('');
   const [newSecurityAnswer, setNewSecurityAnswer] = useState('');
@@ -51,7 +53,7 @@ export default function ProfilePage() {
         const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
         setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
       } else {
-        setCanUpdatePhoneNumberToday(true); // If no timestamp, assume they can update
+        setCanUpdatePhoneNumberToday(true); 
       }
       setCurrentSecurityQuestion(currentUser.securityQuestion || "Not set");
       setNewSecurityQuestion(currentUser.securityQuestion || '');
@@ -85,11 +87,34 @@ export default function ProfilePage() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   }
 
-  const handleChangePicture = async () => {
-    if (!currentUser) return;
-    await changeProfilePicture();
-    toast({ title: "Profile Picture Updated", description: "Your new avatar is being fetched." });
+  const handleChoosePictureClick = () => {
+    fileInputRef.current?.click();
   };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+    event.target.value = ''; // Reset file input
+  };
+
+  const handleUploadPicture = async () => {
+    if (!selectedFile || !currentUser) {
+      toast({ title: "No File Selected", description: "Please choose an image first.", variant: "destructive" });
+      return;
+    }
+    const success = await changeProfilePicture(selectedFile);
+    if (success) {
+      toast({ title: "Profile Picture Updated!", description: "Your new picture is now set." });
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    } else {
+      toast({ title: "Upload Failed", description: "Could not update profile picture. Please try again.", variant: "destructive" });
+    }
+  };
+  
 
   const handleRoleChange = async (newRoleValue: string) => {
     const newRole = newRoleValue as UserRole;
@@ -134,13 +159,10 @@ export default function ProfilePage() {
     });
     if (result.success) {
       setIsEditingPhoneNumber(false);
-      // Re-check canUpdatePhoneNumberToday based on the potentially updated currentUser from context
        if (currentUser?.phoneNumberLastUpdatedAt && currentUser.phoneNumberLastUpdatedAt instanceof Timestamp) {
          const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
          setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
        } else {
-         // If it became null or non-Timestamp after update (should not happen with serverTimestamp)
-         // or if it's the first update, it will be false for today
          setCanUpdatePhoneNumberToday(false); 
        }
     } else {
@@ -195,15 +217,14 @@ export default function ProfilePage() {
       variant: result.success ? "default" : "destructive",
     });
     if (result.success) {
-      setCurrentSecurityQuestion(newSecurityQuestion); // Update local state for display
+      setCurrentSecurityQuestion(newSecurityQuestion); 
       setPinForSecurityUpdate('');
-      setNewSecurityAnswer(''); // Clear input field
+      setNewSecurityAnswer(''); 
     }
     setIsUpdatingSecurity(false);
   };
 
-
-  const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
+  const currentAvatarSrc = previewUrl || currentUser.profilePictureUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
 
   return (
     <div className="container mx-auto p-4">
@@ -212,27 +233,40 @@ export default function ProfilePage() {
         <CardHeader className="items-center text-center border-b pb-6">
           <div className="relative w-24 h-24 mb-4">
             <Avatar className="w-full h-full text-3xl border-2 border-primary">
-              <AvatarImage src={avatarSrc} alt={currentUser.name} data-ai-hint="user avatar placeholder"/>
+              <AvatarImage src={currentAvatarSrc} alt={currentUser.name} data-ai-hint="user avatar placeholder"/>
               <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(currentUser.name)}</AvatarFallback>
             </Avatar>
             <Button
               variant="outline"
               size="icon"
               className="absolute bottom-0 right-0 rounded-full w-8 h-8 bg-card hover:bg-secondary border-primary/50 hover:border-primary"
-              onClick={handleChangePicture}
-              title="Change profile picture"
+              onClick={handleChoosePictureClick}
+              title="Choose profile picture"
             >
               <Camera className="w-4 h-4 text-primary" />
-              <span className="sr-only">Change profile picture</span>
             </Button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileSelected} 
+                accept="image/*" 
+                className="hidden" 
+            />
           </div>
+          {selectedFile && (
+            <div className="flex flex-col items-center space-y-2 mb-2">
+                <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>
+                <Button onClick={handleUploadPicture} size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <UploadCloud className="mr-2 h-4 w-4" /> Upload & Save
+                </Button>
+            </div>
+          )}
           <CardTitle className="text-2xl font-bold text-foreground">{currentUser.name}</CardTitle>
           <CardDescription className="text-md text-muted-foreground">
             Your personal account details and security settings.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          {/* Phone Number Section */}
           <div className="p-3 bg-secondary/50 rounded-lg">
             <div className="flex items-center space-x-3">
               <Phone className="h-6 w-6 text-primary" />
@@ -282,7 +316,6 @@ export default function ProfilePage() {
              )}
           </div>
           
-          {/* Role Section */}
            <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
             <Briefcase className="h-6 w-6 text-primary" />
             <div className="w-full">
@@ -306,7 +339,6 @@ export default function ProfilePage() {
           </div>
           
           <Accordion type="multiple" className="w-full space-y-4">
-            {/* Change PIN Section */}
             <AccordionItem value="change-pin">
               <AccordionTrigger className="text-lg font-semibold hover:no-underline p-3 bg-secondary/50 rounded-lg">
                 <div className="flex items-center">
@@ -334,7 +366,6 @@ export default function ProfilePage() {
               </AccordionContent>
             </AccordionItem>
 
-            {/* Security Question/Answer Section */}
             <AccordionItem value="security-qa">
               <AccordionTrigger className="text-lg font-semibold hover:no-underline p-3 bg-secondary/50 rounded-lg">
                 <div className="flex flex-col items-start text-left w-full">

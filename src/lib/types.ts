@@ -9,7 +9,7 @@ export interface User {
   name: string;
   pin: string;
   role: UserRole;
-  profileImageVersion?: number;
+  profilePictureUrl?: string | null; // Changed from profileImageVersion
   phoneNumberLastUpdatedAt?: Timestamp | null;
   securityQuestion?: string;
   securityAnswer?: string;

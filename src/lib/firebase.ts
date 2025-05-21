@@ -2,6 +2,8 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from "firebase/storage"; // Import Firebase Storage
+
 // import { getAnalytics } from "firebase/analytics"; // Only if you need analytics
 
 const firebaseConfig = {
@@ -24,5 +26,7 @@ if (!getApps().length) {
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app); // Export Firebase Storage instance
 
 // const analytics = getAnalytics(app); // Only if you need analytics
+

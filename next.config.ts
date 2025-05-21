@@ -25,7 +25,13 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'i.pravatar.cc', // Added for user avatars
+        hostname: 'i.pravatar.cc', 
+        port: '',
+        pathname: '/**',
+      },
+      { // Added for Firebase Storage
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
         port: '',
         pathname: '/**',
       }

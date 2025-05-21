@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, LogOut, ScrollText } from 'lucide-react'; // Added ScrollText for Ride Log
+import { User, LogOut, ScrollText } from 'lucide-react'; 
 import type { User as AuthUser } from '@/lib/types';
 
 const getInitials = (name: string = "") => {
@@ -41,7 +41,8 @@ export function UserProfileDropdown() {
     router.push('/driver/ride-log');
   };
 
-  const avatarSrc = `https://i.pravatar.cc/150?u=${currentUser.id}${currentUser.profileImageVersion ? `-${currentUser.profileImageVersion}` : ''}`;
+  // Prioritize profilePictureUrl, then pravatar
+  const avatarSrc = currentUser.profilePictureUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
 
   return (
     <DropdownMenu>
