@@ -223,7 +223,7 @@ export default function RideDetailPage() {
           </div>
           
           {(isPassenger || (isRideOwnerDriver)) && ride.status !== 'Completed' && ride.status !== 'Cancelled' && (
-             <div className="grid grid-cols-2 gap-3 pt-4 border-t mt-4">
+             <div className="grid grid-cols-2 gap-3 pt-4 mt-4">
                 <Button 
                   variant="outline"
                   onClick={handleCall}
