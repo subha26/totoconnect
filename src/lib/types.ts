@@ -9,7 +9,7 @@ export interface User {
   name: string;
   pin: string;
   role: UserRole;
-  profilePictureUrl?: string | null; // Changed from profileImageVersion
+  profilePictureDataUrl?: string | null; // Changed from profilePictureUrl, will store Base64 Data URI
   phoneNumberLastUpdatedAt?: Timestamp | null;
   securityQuestion?: string;
   securityAnswer?: string;
@@ -52,8 +52,8 @@ export interface Ride {
   currentLongitude?: number;
   progress?: number;
   requestedBy?: string; // Passenger User ID who made the request
-  requestType?: RideRequestType; 
-  maxPassengers?: number; 
+  requestType?: RideRequestType;
+  maxPassengers?: number;
   wasCreatedAsRecurring?: boolean; // New field for recurring ride indicator
 }
 
@@ -72,8 +72,8 @@ export interface RideFirestoreData {
   currentLongitude?: number;
   progress?: number;
   requestedBy?: string;
-  requestType?: RideRequestType; 
-  maxPassengers?: number; 
+  requestType?: RideRequestType;
+  maxPassengers?: number;
   wasCreatedAsRecurring?: boolean; // New field
 }
 

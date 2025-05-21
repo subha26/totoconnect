@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react'; // Added useRef
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Phone, Briefcase, LogOut, Camera, Edit3, Save, XCircle, KeyRound, ShieldQuestion, MessageCircle, UploadCloud } from 'lucide-react'; // Added UploadCloud
+import { User, Phone, Briefcase, LogOut, Camera, Edit3, Save, XCircle, KeyRound, ShieldQuestion, MessageCircle, UploadCloud } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,10 +15,10 @@ import type { UserRole } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { format, isSameDay } from 'date-fns';
-import { Timestamp } from 'firebase/firestore'; 
+import { Timestamp } from 'firebase/firestore';
 import { SECURITY_QUESTIONS } from '@/lib/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import Image from 'next/image'; // For image preview
+// Image import from 'next/image' might not be needed if using AvatarImage with Data URI directly.
 
 export default function ProfilePage() {
   const { currentUser, logout, isLoading, changeProfilePicture, updateUserRole, updatePhoneNumber, changePin, updateSecurityQA } = useAuth();
@@ -27,7 +27,7 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // For Base64 preview
 
   const [isEditingPhoneNumber, setIsEditingPhoneNumber] = useState(false);
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
@@ -53,10 +53,15 @@ export default function ProfilePage() {
         const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
         setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
       } else {
-        setCanUpdatePhoneNumberToday(true); 
+        setCanUpdatePhoneNumberToday(true);
       }
       setCurrentSecurityQuestion(currentUser.securityQuestion || "Not set");
       setNewSecurityQuestion(currentUser.securityQuestion || '');
+      if (currentUser.profilePictureDataUrl) {
+        setPreviewUrl(currentUser.profilePictureDataUrl); // Set preview if already exists
+      } else {
+        setPreviewUrl(null); // Clear preview if no image
+      }
     }
   }, [currentUser]);
 
@@ -94,10 +99,26 @@ export default function ProfilePage() {
   const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Basic client-side validation (optional, but good practice)
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid File", description: "Please select an image file.", variant: "destructive" });
+        return;
+      }
+      const MAX_FILE_SIZE_KB = 200; // Match context limit for user feedback
+      if (file.size > MAX_FILE_SIZE_KB * 1024) {
+          toast({ title: "Image Too Large", description: `Please select an image smaller than ${MAX_FILE_SIZE_KB}KB.`, variant: "destructive" });
+          return;
+      }
+
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      // Generate a preview URL for the selected file (Base64)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
-    event.target.value = ''; // Reset file input
+    event.target.value = '';
   };
 
   const handleUploadPicture = async () => {
@@ -105,16 +126,15 @@ export default function ProfilePage() {
       toast({ title: "No File Selected", description: "Please choose an image first.", variant: "destructive" });
       return;
     }
-    const success = await changeProfilePicture(selectedFile);
+    const success = await changeProfilePicture(selectedFile); // This now handles Base64
     if (success) {
       toast({ title: "Profile Picture Updated!", description: "Your new picture is now set." });
-      setSelectedFile(null);
-      setPreviewUrl(null);
+      // No need to clear selectedFile or previewUrl here, as currentUser update will re-render
     } else {
-      toast({ title: "Upload Failed", description: "Could not update profile picture. Please try again.", variant: "destructive" });
+      // Toast for failure is handled in AuthContext, but you could add specific UI feedback if needed
     }
   };
-  
+
 
   const handleRoleChange = async (newRoleValue: string) => {
     const newRole = newRoleValue as UserRole;
@@ -163,7 +183,7 @@ export default function ProfilePage() {
          const lastUpdate = currentUser.phoneNumberLastUpdatedAt.toDate();
          setCanUpdatePhoneNumberToday(!isSameDay(lastUpdate, new Date()));
        } else {
-         setCanUpdatePhoneNumberToday(false); 
+         setCanUpdatePhoneNumberToday(false);
        }
     } else {
       setPhoneEditError(result.message);
@@ -217,14 +237,15 @@ export default function ProfilePage() {
       variant: result.success ? "default" : "destructive",
     });
     if (result.success) {
-      setCurrentSecurityQuestion(newSecurityQuestion); 
+      setCurrentSecurityQuestion(newSecurityQuestion);
       setPinForSecurityUpdate('');
-      setNewSecurityAnswer(''); 
+      setNewSecurityAnswer('');
     }
     setIsUpdatingSecurity(false);
   };
 
-  const currentAvatarSrc = previewUrl || currentUser.profilePictureUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
+  // Use previewUrl if selected, otherwise currentUser.profilePictureDataUrl, then fallback to pravatar
+  const avatarDisplaySrc = previewUrl || currentUser.profilePictureDataUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
 
   return (
     <div className="container mx-auto p-4">
@@ -233,7 +254,7 @@ export default function ProfilePage() {
         <CardHeader className="items-center text-center border-b pb-6">
           <div className="relative w-24 h-24 mb-4">
             <Avatar className="w-full h-full text-3xl border-2 border-primary">
-              <AvatarImage src={currentAvatarSrc} alt={currentUser.name} data-ai-hint="user avatar placeholder"/>
+              <AvatarImage src={avatarDisplaySrc} alt={currentUser.name} data-ai-hint="user avatar placeholder"/>
               <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(currentUser.name)}</AvatarFallback>
             </Avatar>
             <Button
@@ -245,15 +266,15 @@ export default function ProfilePage() {
             >
               <Camera className="w-4 h-4 text-primary" />
             </Button>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileSelected} 
-                accept="image/*" 
-                className="hidden" 
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelected}
+                accept="image/*"
+                className="hidden"
             />
           </div>
-          {selectedFile && (
+          {selectedFile && previewUrl && ( // Only show upload button if a file is selected AND a preview (which means selection was successful) is available
             <div className="flex flex-col items-center space-y-2 mb-2">
                 <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>
                 <Button onClick={handleUploadPicture} size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
@@ -315,7 +336,7 @@ export default function ProfilePage() {
                  </p>
              )}
           </div>
-          
+
            <div className="flex items-center space-x-3 p-3 bg-secondary/50 rounded-lg">
             <Briefcase className="h-6 w-6 text-primary" />
             <div className="w-full">
@@ -337,7 +358,7 @@ export default function ProfilePage() {
                 </Select>
             </div>
           </div>
-          
+
           <Accordion type="multiple" className="w-full space-y-4">
             <AccordionItem value="change-pin">
               <AccordionTrigger className="text-lg font-semibold hover:no-underline p-3 bg-secondary/50 rounded-lg">
@@ -410,7 +431,7 @@ export default function ProfilePage() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-          
+
           <Button onClick={logout} variant="destructive" className="w-full text-lg py-3 mt-4">
             <LogOut className="mr-2 h-5 w-5" /> Logout
           </Button>

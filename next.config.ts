@@ -25,16 +25,16 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'i.pravatar.cc', 
+        hostname: 'i.pravatar.cc',
         port: '',
         pathname: '/**',
       },
-      { // Added for Firebase Storage
-        protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
-        port: '',
-        pathname: '/**',
-      }
+      // { // Removed as Firebase Storage is not used for profile pictures with Base64 approach
+      //   protocol: 'https',
+      //   hostname: 'firebasestorage.googleapis.com',
+      //   port: '',
+      //   pathname: '/**',
+      // }
     ],
   },
 };

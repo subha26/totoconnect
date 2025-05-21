@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, LogOut, ScrollText } from 'lucide-react'; 
+import { User, LogOut, ScrollText } from 'lucide-react';
 import type { User as AuthUser } from '@/lib/types';
 
 const getInitials = (name: string = "") => {
@@ -41,18 +41,18 @@ export function UserProfileDropdown() {
     router.push('/driver/ride-log');
   };
 
-  // Prioritize profilePictureUrl, then pravatar
-  const avatarSrc = currentUser.profilePictureUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
+  // Prioritize profilePictureDataUrl (Base64), then pravatar
+  const avatarSrc = currentUser.profilePictureDataUrl || `https://i.pravatar.cc/150?u=${currentUser.id}`;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="rounded-full w-10 h-10 p-0">
           <Avatar className="w-9 h-9">
-            <AvatarImage 
-              src={avatarSrc} 
-              alt={currentUser.name} 
-              data-ai-hint="user avatar placeholder" 
+            <AvatarImage
+              src={avatarSrc}
+              alt={currentUser.name}
+              data-ai-hint="user avatar placeholder"
             />
             <AvatarFallback className="bg-primary text-primary-foreground text-xs">
               {getInitials(currentUser.name)}
