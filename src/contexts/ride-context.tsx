@@ -82,15 +82,8 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
           departureTime: (data.departureTime as Timestamp).toDate().toISOString(),
         } as Ride;
 
-        // If a ride is 'Requested' and its departure time has passed, it's considered expired client-side
-        // unless its status is already 'Expired' (or another terminal status).
-        // This client-side filtering prevents showing outdated 'Requested' rides.
-        // Ideally, a backend process would update the status to 'Expired' in Firestore.
         if (ride.status === 'Requested' && new Date(ride.departureTime) < new Date()) {
-          // This ride is a 'Requested' ride whose time has passed.
-          // We effectively filter it out by not adding it to fetchedRides
-          // if it hasn't been explicitly marked 'Expired' yet.
-          // The backend should eventually mark such rides as 'Expired'.
+           // Client-side filtering for display, backend should ideally update status
         } else {
           fetchedRides.push(ride);
         }
@@ -233,12 +226,14 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     try {
       const rideSnap = await getDoc(rideRef);
       if (!rideSnap.exists()) {
+        toast({ title: "Ride Not Found", variant: "destructive" });
         return false;
       }
-      const rideData = rideSnap.data() as Ride;
+      const rideData = rideSnap.data() as Ride; 
       const passengerToRemove = rideData.passengers.find(p => p.userId === currentUser.id);
 
       if (!passengerToRemove) {
+         toast({ title: "Not Reserved", description: "You haven't reserved a seat on this ride.", variant: "destructive" });
          return false; 
       }
       if (rideData.status !== 'Scheduled' && rideData.status !== 'About to Depart') {
@@ -246,6 +241,19 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // New logic for 'full_reserved' rides
+      if (rideData.requestType === 'full_reserved' && rideData.requestedBy === currentUser.id) {
+        await updateDoc(rideRef, {
+          status: 'Cancelled' as RideStatus,
+          passengers: [], 
+          seatsAvailable: rideData.totalSeats, 
+        });
+        toast({ title: "Private Ride Cancelled", description: "Your fully reserved ride has been cancelled." });
+        // Driver notification can be handled by the driver observing the status change.
+        return true;
+      }
+
+      // Original logic for 'sharing' rides
       await updateDoc(rideRef, {
         seatsAvailable: rideData.seatsAvailable + 1,
         passengers: arrayRemove(passengerToRemove),
@@ -253,6 +261,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
       return true;
     } catch (error) {
       console.error("Error cancelling reservation: ", error);
+      toast({ title: "Cancellation Error", description: "Could not cancel reservation.", variant: "destructive" });
       return false;
     }
   };

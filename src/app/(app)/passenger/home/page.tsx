@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { isSameDay } from 'date-fns';
+import { addDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 
 
 export default function PassengerHomePage() {
@@ -38,7 +38,7 @@ export default function PassengerHomePage() {
     cancelReservation,
     currentPassengerRide,
     passengerActiveRequests,
-    deleteRideRequest // New function from context
+    deleteRideRequest
   } = useRides();
   const { toast } = useToast();
 
@@ -64,7 +64,12 @@ export default function PassengerHomePage() {
   const handleCancelReservation = async (rideId: string) => {
     const success = await cancelReservation(rideId);
     if (success) {
-      toast({ title: "Reservation Cancelled", description: "Your seat has been cancelled." });
+      // Toast for successful cancellation is handled in context if it's a full_reserved ride
+      // or here if it's a general sharing ride.
+      const ride = allRides.find(r => r.id === rideId);
+      if (ride && ride.requestType !== 'full_reserved') {
+         toast({ title: "Reservation Cancelled", description: "Your seat has been cancelled." });
+      }
     } else {
       toast({ title: "Cancellation Failed", variant: "destructive" });
     }
@@ -89,14 +94,22 @@ export default function PassengerHomePage() {
   const availableRides = useMemo(() => {
     if (!currentUser) return [];
     const today = new Date();
+    const startOfToday = startOfDay(today);
+    // Rides available from today up to the end of the day 2 days from now (total 3 days)
+    const endOfThirdDay = endOfDay(addDays(today, 2)); 
+
+
     const potentiallyAvailable = allRides.filter(ride => 
       ride.status === 'Scheduled' &&
-      isSameDay(new Date(ride.departureTime), today) && // Show only today's rides
-      new Date(ride.departureTime) >= today && // Ensure it's not in the past today
+      new Date(ride.departureTime) >= today && // Must not be in the past of the current moment
+      isWithinInterval(new Date(ride.departureTime), { start: startOfToday, end: endOfThirdDay }) &&
       ride.seatsAvailable > 0 &&
       !ride.passengers.find(p => p.userId === currentUser.id) &&
       ride.driverId !== currentUser.id &&
-      ride.requestType !== 'full_reserved' // Don't show fully reserved rides to others
+      // Don't show 'full_reserved' rides requested by *other* users in the general available list.
+      // If a driver *posts* a full_reserved ride (not a current feature), this logic might need adjustment.
+      // For now, full_reserved rides are created by passenger requests.
+      ride.requestType !== 'full_reserved' 
     );
 
     const uniqueRideOfferKeys = new Set<string>();
@@ -160,7 +173,7 @@ export default function PassengerHomePage() {
                       ride={ride} 
                       userRole="passenger"
                       onViewDetails={() => router.push(`/ride/${ride.id}`)}
-                      onDeleteRequest={handleDeleteRequest} // Pass delete handler
+                      onDeleteRequest={handleDeleteRequest} 
                       className="flex-none w-[300px] sm:w-[320px] md:w-[350px]"
                   />
                   ))}
@@ -172,7 +185,7 @@ export default function PassengerHomePage() {
 
       <section>
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-xl font-semibold text-foreground">Available Rides for Today</h2>
+          <h2 className="text-xl font-semibold text-foreground">Available Rides (Next 3 Days)</h2>
         </div>
         {availableRides.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -191,7 +204,7 @@ export default function PassengerHomePage() {
           <Card className="shadow-lg rounded-xl">
             <CardContent className="p-6 text-center">
               <Image src="https://placehold.co/300x200.png" alt="No rides available" width={300} height={200} className="mx-auto rounded-md mb-4" data-ai-hint="empty street calendar" />
-              <p className="text-muted-foreground">No scheduled rides available for today. Try requesting one!</p>
+              <p className="text-muted-foreground">No scheduled rides available in the next 3 days. Try requesting one!</p>
             </CardContent>
           </Card>
         )}
