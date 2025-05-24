@@ -137,8 +137,8 @@ export default function DriverHomePage() {
     if (currentDriverRide && currentDriverRide.status === 'On Route') {
         intervalId = setInterval(() => {
             if (currentDriverRide.progress === undefined || currentDriverRide.progress >= 100) {
-                if (intervalId) clearInterval(intervalId);
-                if(currentDriverRide.progress >=100 && currentDriverRide.status !== 'Completed') {
+                if (intervalId) clearInterval(intervalId); // Stop interval once progress hits 100 or undefined/null
+                if((currentDriverRide.progress ?? 0) >= 100 && currentDriverRide.status !== 'Completed') {
                   if (typeof updateRideStatus === 'function') {
                       updateRideStatus(currentDriverRide.id, 'Destination Reached', 100);
                   }
