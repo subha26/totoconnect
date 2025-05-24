@@ -237,7 +237,7 @@ export function RideCard({
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg md:text-xl text-primary flex items-center">
             {origin} to {destination}
-            {wasCreatedAsRecurring && <Repeat className="ml-2 h-4 w-4 text-primary/70" title="Recurring ride instance"/>}
+            {wasCreatedAsRecurring && <Repeat className="ml-2 h-4 w-4 text-primary/70" />}
           </CardTitle>
           <div className="flex items-center space-x-2 text-sm text-primary">
             <RideStatusIcon status={status} />
@@ -326,3 +326,4 @@ export function RideCard({
     </Card>
   );
 }
+
