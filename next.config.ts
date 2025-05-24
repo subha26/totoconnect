@@ -13,6 +13,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  i18n: null, // Explicitly set i18n to null
   /* config options here */
   typescript: {
     // ignoreBuildErrors: true, // Removed
