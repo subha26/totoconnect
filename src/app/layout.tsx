@@ -15,6 +15,18 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'TotoConnect',
   description: 'Shared Toto rides for college commute.',
+  manifest: '/manifest.json', // Link to the manifest file
+  themeColor: '#202A73', // Primary theme color
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TotoConnect',
+    // startupImage: [], // You can add splash screen images here
+  },
+  icons: {
+    icon: '/icons/icon-192x192.png', // Default icon
+    apple: '/icons/apple-touch-icon.png', // Apple touch icon
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +36,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* It's good practice to include theme-color meta tag here too, though Metadata API also handles it */}
+        <meta name="theme-color" content="#202A73" />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <AuthProvider>
           <RideProvider>
