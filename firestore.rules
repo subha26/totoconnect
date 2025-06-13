@@ -1,0 +1,156 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      // In a scenario without full Firebase Auth, this might always be false from a rules perspective,
+      // or you might implement custom token verification if you advance your auth.
+      // For now, if you are NOT using Firebase Auth sign-in, treat this as if the user is not "Firebase authenticated".
+      return request.auth != null;
+    }
+
+    function getRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    function isUser(userId) {
+      // This function assumes that if a request.auth exists, its uid IS the userId.
+      // If you are not using Firebase Auth, request.auth will be null.
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Users Collection
+    // - userId is the phone number
+    match /users/{userId} {
+      // Allow anyone to create a user (signup)
+      allow create: if request.resource.data.phoneNumber == userId &&
+                       request.resource.data.pin is string &&
+                       request.resource.data.name is string &&
+                       request.resource.data.role in ['passenger', 'driver'] &&
+                       request.resource.data.securityQuestion is string &&
+                       request.resource.data.securityAnswer is string;
+
+      // Allow a user to read their own data
+      // Allow an authenticated user to read minimal data of other users (e.g., driver/passenger name for a ride)
+      // For now, this is quite open. You might want to restrict fields read by others.
+      allow read: if true; // In a real app with Firebase Auth, you'd use: isUser(userId) || isSignedIn();
+
+      // Allow a user to update their own data.
+      // Specific fields that can be updated should be granularly controlled.
+      allow update: if true && ( // Replace true with isUser(userId) if using Firebase Auth
+        // Fields a user can always update
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pin', 'role', 'profilePictureDataUrl', 'securityQuestion', 'securityAnswer'])) ||
+        // Phone number update logic (can only update own phone number, and only specific fields during this process)
+        (request.resource.data.phoneNumber != resource.data.phoneNumber &&
+         request.resource.data.id == request.resource.data.phoneNumber && // new ID must match new phone number
+         request.resource.data.keys().hasAll(['id', 'phoneNumber', 'name', 'pin', 'role', 'profilePictureDataUrl', 'securityQuestion', 'securityAnswer', 'phoneNumberLastUpdatedAt']) &&
+         request.resource.data.phoneNumberLastUpdatedAt == request.time // Ensure last updated timestamp is set by server
+        )
+      );
+      // No one can delete user accounts directly through client (handle through admin/functions if needed)
+      allow delete: if false;
+    }
+
+    // Rides Collection
+    match /rides/{rideId} {
+      allow read: if true; // Any user can read ride details
+
+      // Creating a new ride (posting or requesting)
+      allow create: if (
+                      // Driver posting a ride
+                      (request.resource.data.driverId != null && getRole(request.resource.data.driverId) == 'driver') ||
+                      // Passenger requesting a ride
+                      (request.resource.data.requestedBy != null && getRole(request.resource.data.requestedBy) == 'passenger')
+                    ) &&
+                    request.resource.data.origin is string &&
+                    request.resource.data.destination is string &&
+                    request.resource.data.departureTime is timestamp &&
+                    request.resource.data.totalSeats is number &&
+                    request.resource.data.seatsAvailable is number &&
+                    request.resource.data.status is string &&
+                    request.resource.data.passengers is list &&
+                    (!('wasCreatedAsRecurring' in request.resource.data) || request.resource.data.wasCreatedAsRecurring is bool);
+
+
+      // Updating a ride
+      allow update: if
+          // Case 1: Driver accepts a passenger's request
+          (resource.data.status == 'Requested' && request.resource.data.status == 'Scheduled' &&
+           request.resource.data.driverId != null && getRole(request.resource.data.driverId) == 'driver' &&
+           request.resource.data.passengers[0].userId == resource.data.requestedBy // Ensure passenger being added is the one who requested
+          ) ||
+          // Case 2: Passenger reserves a seat (on a non-full_reserved ride)
+          (resource.data.status == 'Scheduled' && request.resource.data.seatsAvailable == resource.data.seatsAvailable - 1 &&
+           request.resource.data.passengers.size() == resource.data.passengers.size() + 1 &&
+           // Ensure the passenger being added is the one making the request (difficult without request.auth.uid)
+           // This part needs client-side integrity or Firebase Auth for true security
+           resource.data.requestType != 'full_reserved'
+          ) ||
+          // Case 3: Passenger cancels reservation
+          ((resource.data.status == 'Scheduled' || resource.data.status == 'About to Depart') &&
+            (
+              // Regular sharing cancellation
+              (request.resource.data.seatsAvailable == resource.data.seatsAvailable + 1 &&
+               request.resource.data.passengers.size() == resource.data.passengers.size() - 1 &&
+               resource.data.requestType != 'full_reserved'
+              ) ||
+              // Full reserved ride cancellation by requester
+              (request.resource.data.status == 'Cancelled' &&
+               resource.data.requestType == 'full_reserved' &&
+               resource.data.passengers.size() > 0 && // was previously reserved
+               request.resource.data.passengers.size() == 0 && // now no passengers
+               request.resource.data.seatsAvailable == request.resource.data.totalSeats // seats reset
+              )
+            )
+           // Ensure the passenger cancelling is one of the existing passengers (difficult without request.auth.uid)
+           // This part needs client-side integrity or Firebase Auth
+          ) ||
+          // Case 4: Driver updates ride status (start, complete, cancel their own ride, progress)
+          (resource.data.driverId != null && getRole(resource.data.driverId) == 'driver' && // Assuming only the assigned driver can update
+           (request.resource.data.status != resource.data.status || request.resource.data.progress != resource.data.progress) &&
+           request.resource.data.keys().hasAny(['status', 'progress']) // Only allow status/progress changes by driver here
+          ) ||
+          // Case 5: Driver edits their own ride details (origin, dest, time, seats) - before it's "On Route"
+          (resource.data.driverId != null && getRole(resource.data.driverId) == 'driver' &&
+            resource.data.status == 'Scheduled' && // Only allow edits for scheduled rides
+            request.resource.data.status == resource.data.status && // Status cannot be changed in this specific edit
+            (
+                request.resource.data.origin != resource.data.origin ||
+                request.resource.data.destination != resource.data.destination ||
+                request.resource.data.departureTime != resource.data.departureTime ||
+                request.resource.data.totalSeats != resource.data.totalSeats ||
+                request.resource.data.seatsAvailable != resource.data.seatsAvailable // derived from totalSeats and passengers
+            )
+          );
+
+      // Deleting a ride
+      allow delete: if
+          // Case 1: Driver deletes their own ride (if no passengers)
+          (resource.data.driverId != null && getRole(resource.data.driverId) == 'driver' && resource.data.passengers.size() == 0) ||
+          // Case 2: Passenger deletes their own "Requested" ride
+          (resource.data.requestedBy != null && getRole(resource.data.requestedBy) == 'passenger' && resource.data.status == 'Requested');
+    }
+
+    // Chats Collection
+    // - Subcollection under each ride
+    match /chats/{rideId}/messages/{messageId} {
+      // Allow read if user is part of the ride (either driver or a passenger)
+      // This is complex without request.auth.uid. For now, let's assume if they can see the ride, they can see chat.
+      // A more secure rule would check get(/databases/$(database)/documents/rides/$(rideId)).data
+      // and see if request.auth.uid is driverId or in passengers list.
+      allow read: if true; // Needs proper auth check
+
+      // Allow write if user is part of the ride
+      allow create: if request.resource.data.senderId != null && // Requires senderId to be passed from client
+                       request.resource.data.text is string &&
+                       request.resource.data.timestamp == request.time; // Ensure server timestamp
+                       // Add check: getRole(request.resource.data.senderId) != null
+                       // And check if senderId is driver or passenger of rideId
+    }
+  }
+}
+
+    
