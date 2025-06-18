@@ -10,15 +10,6 @@ export const LOCATIONS = {
 export const MAIN_ROAD_COORDS = { latitude: 22.5726, longitude: 88.3639 };
 export const COLLEGE_COORDS = { latitude: 22.5700, longitude: 88.3700 };
 
-// Test Credentials
-export const TEST_PASSENGER_PHONE = "1234567890";
-export const TEST_PASSENGER_PIN = "1234";
-export const TEST_PASSENGER_NAME = "Test Passenger";
-
-export const TEST_DRIVER_PHONE = "0987654321";
-export const TEST_DRIVER_PIN = "4321";
-export const TEST_DRIVER_NAME = "Test Driver";
-
 export const DEFAULT_TOTAL_SEATS = 4; // Updated from 3 to 4
 
 export const SECURITY_QUESTIONS = [
@@ -31,4 +22,3 @@ export const SECURITY_QUESTIONS = [
   "What was the name of your first pet?",
   "What was the make and model of your first car?",
 ];
-

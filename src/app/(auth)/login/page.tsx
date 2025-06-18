@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Phone, KeyRound, LogIn } from 'lucide-react';
-import { APP_NAME, TEST_PASSENGER_PHONE, TEST_PASSENGER_PIN, TEST_DRIVER_PHONE, TEST_DRIVER_PIN } from '@/lib/constants';
+import { APP_NAME } from '@/lib/constants';
 
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -37,17 +37,6 @@ export default function LoginPage() {
     }
     // Redirection is handled by AuthContext
   };
-
-  const fillPassengerTestData = () => {
-    setPhoneNumber(TEST_PASSENGER_PHONE);
-    setPin(TEST_PASSENGER_PIN);
-  };
-
-  const fillDriverTestData = () => {
-    setPhoneNumber(TEST_DRIVER_PHONE);
-    setPin(TEST_DRIVER_PIN);
-  };
-
 
   return (
     <Card className="w-full max-w-md shadow-none border-none">
@@ -99,10 +88,6 @@ export default function LoginPage() {
             {isLoading ? 'Logging In...' : 'Login'}
           </Button>
         </form>
-        <div className="mt-4 flex justify-between text-sm">
-          <Button variant="link" size="sm" onClick={fillPassengerTestData}>Test Passenger</Button>
-          <Button variant="link" size="sm" onClick={fillDriverTestData}>Test Driver</Button>
-        </div>
       </CardContent>
       <CardFooter className="flex flex-col items-center space-y-2">
         <p className="text-sm text-muted-foreground">

@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 // Firebase Storage functions (ref, uploadBytes, getDownloadURL) are removed as we are using Base64
-import { TEST_PASSENGER_PHONE, TEST_PASSENGER_PIN, TEST_PASSENGER_NAME, TEST_DRIVER_PHONE, TEST_DRIVER_PIN, TEST_DRIVER_NAME, SECURITY_QUESTIONS } from '@/lib/constants';
+import { SECURITY_QUESTIONS } from '@/lib/constants';
 import { isSameDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -472,29 +472,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
   };
-
-  useEffect(() => {
-    const seedMockUser = async (mockUser: User) => {
-      const userRef = doc(db, "users", mockUser.phoneNumber);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          ...mockUser,
-          id: mockUser.phoneNumber,
-          profilePictureDataUrl: mockUser.profilePictureDataUrl || null,
-          phoneNumberLastUpdatedAt: mockUser.phoneNumberLastUpdatedAt || null,
-          securityQuestion: mockUser.securityQuestion || SECURITY_QUESTIONS[0],
-          securityAnswer: mockUser.securityAnswer || "testanswer"
-        });
-        console.log(`Mock user ${mockUser.name} added to Firestore with ID ${mockUser.phoneNumber}.`);
-      }
-    };
-
-    const passengerMockForDb: User = { id: TEST_PASSENGER_PHONE, phoneNumber: TEST_PASSENGER_PHONE, name: TEST_PASSENGER_NAME, pin: TEST_PASSENGER_PIN, role: 'passenger', profilePictureDataUrl: null, securityQuestion: SECURITY_QUESTIONS[0], securityAnswer: "testanswer", phoneNumberLastUpdatedAt: null };
-    const driverMockForDb: User = { id: TEST_DRIVER_PHONE, phoneNumber: TEST_DRIVER_PHONE, name: TEST_DRIVER_NAME, pin: TEST_DRIVER_PIN, role: 'driver', profilePictureDataUrl: null, securityQuestion: SECURITY_QUESTIONS[0], securityAnswer: "testanswer", phoneNumberLastUpdatedAt: null };
-
-  }, []);
-
 
   return (
     <AuthContext.Provider value={{
