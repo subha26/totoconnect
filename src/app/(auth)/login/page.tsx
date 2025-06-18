@@ -60,7 +60,7 @@ export default function LoginPage() {
               placeholder="9876543210"
               maxLength={10}
               required
-              className="text-lg"
+              className="text-lg placeholder:text-muted-foreground"
             />
           </div>
           <div className="space-y-2">
@@ -81,7 +81,7 @@ export default function LoginPage() {
               placeholder="••••"
               maxLength={4}
               required
-              className="text-lg tracking-widest"
+              className="text-lg tracking-widest placeholder:text-muted-foreground"
             />
           </div>
           <Button type="submit" className="w-full text-lg py-3" disabled={isLoading}>
